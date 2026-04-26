@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block main %}
+<div id="plant-state"
+     hx-get="/partials/plant_state"
+     hx-trigger="load, every {{ poll.kpi }}ms"
+     hx-swap="innerHTML"></div>
+
+<div id="kpi-row"
+     hx-get="/partials/kpi_row"
+     hx-trigger="load, every {{ poll.kpi }}ms"
+     hx-swap="innerHTML"></div>
+
+<section class="panel" id="andon-panel"
+         data-andon-url="{{ andon_url }}"
+         data-andon-token="{{ andon_token }}"
+         data-andon-poll-ms="{{ poll.andon }}">
+  <header class="panel-header">
+    <h2>Andon board</h2>
+    <span class="panel-badge" id="andon-badge">⚡ served by Processing Engine: <span id="andon-latency">–</span> ms</span>
+  </header>
+  <div id="andon-content">loading…</div>
+</section>
+
+<section class="panel" id="oee-panel" data-oee-poll-ms="{{ poll.oee }}">
+  <header class="panel-header"><h2>Per-line OEE breakdown (last 60 min)</h2></header>
+  <div id="oee-charts">
+    <div class="oee-chart" id="chart-l1"></div>
+    <div class="oee-chart" id="chart-l2"></div>
+    <div class="oee-chart" id="chart-l3"></div>
+  </div>
+</section>
+
+<div id="alerts"
+     hx-get="/partials/alerts"
+     hx-trigger="load, every {{ poll.alerts }}ms"
+     hx-swap="innerHTML"></div>
+{% endblock %}

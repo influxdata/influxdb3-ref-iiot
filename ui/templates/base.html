@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}IIoT — InfluxDB 3 Enterprise reference{% endblock %}</title>
+  <link rel="stylesheet" href="/static/uplot.min.css">
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/htmx.min.js"></script>
+  <script src="/static/uplot.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">influxdb3-ref-iiot</span>
+      <span class="brand-tag">factory floor monitoring · InfluxDB 3 Enterprise reference</span>
+    </div>
+  </header>
+  <main>{% block main %}{% endblock %}</main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
