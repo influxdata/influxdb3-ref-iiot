@@ -31,9 +31,12 @@ from datetime import UTC, datetime
 # Window for "current shift" current OEE values and recent alerts.
 SHIFT_WINDOW_SQL = "INTERVAL '8 hours'"
 ALERT_WINDOW_SQL = "INTERVAL '15 minutes'"
-# Historical window for the chart (per-minute buckets).
-HISTORY_WINDOW_SQL = "INTERVAL '60 minutes'"
-HISTORY_BUCKET_SQL = "INTERVAL '1 minute'"
+# Historical window for the chart. 10-second buckets over a 10-minute
+# window: 60 points per line, the chart fills within ~30s of simulator
+# start, and every poll shows fresh movement. Per-minute buckets at the
+# 60-minute window made the demo look idle for the first two minutes.
+HISTORY_WINDOW_SQL = "INTERVAL '10 minutes'"
+HISTORY_BUCKET_SQL = "INTERVAL '10 seconds'"
 # Ideal cycle time per machine (seconds). For per-line Performance, the
 # ideal output across N parallel machines for the bucket is N * bucket_seconds
 # / ideal_cycle_s, which equals running_seconds / ideal_cycle_s — so
@@ -151,20 +154,32 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
 
     def _compute_oee(running_s: float, planned_s: float, total: float, good: float) -> dict:
         availability = (running_s / planned_s) if planned_s > 0 else 0.0
-        performance = (
-            min(1.0, (IDEAL_CYCLE_S * total) / running_s) if running_s > 0 else 0.0
-        )
-        quality = (good / total) if total > 0 else 0.0
+        # When a bucket has no parts yet (early bucket: cycles haven't completed;
+        # idle bucket: no production), performance and quality are undefined,
+        # not zero. Returning None makes the chart draw a gap there instead
+        # of a misleading dip to 0%.
+        if total > 0 and running_s > 0:
+            performance: float | None = min(1.0, (IDEAL_CYCLE_S * total) / running_s)
+            quality: float | None = good / total
+            oee: float | None = availability * performance * quality
+        else:
+            performance = None
+            quality = None
+            oee = None
         return {
             "availability": round(availability, 4),
-            "performance": round(performance, 4),
-            "quality": round(quality, 4),
-            "oee": round(availability * performance * quality, 4),
+            "performance": None if performance is None else round(performance, 4),
+            "quality": None if quality is None else round(quality, 4),
+            "oee": None if oee is None else round(oee, 4),
         }
 
     def _history_for(line_id: str) -> list[dict]:
-        # Union of buckets from both queries — a bucket present in one but not
-        # the other is still rendered (with the missing side defaulting to 0).
+        # Union of buckets from both queries — a bucket present in one but
+        # not the other is still rendered (with the missing side defaulting
+        # to 0). Edge buckets (cutoff bucket, current incomplete bucket)
+        # are kept; _compute_oee returns None for performance/quality when
+        # total_count is 0, so partial-slice buckets render as a gap in the
+        # P/Q lines instead of a dip to zero.
         buckets = sorted({b for (lid, b) in state_hist if lid == line_id} |
                          {b for (lid, b) in parts_hist if lid == line_id})
         out = []

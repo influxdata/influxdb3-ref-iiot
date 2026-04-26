@@ -71,13 +71,32 @@
 
   var Y_RANGE = [0.7, 1.02];
 
+  // Render the legend as HTML in a header element so each series can show
+  // an actual colored bar (solid / dashed / dotted) instead of describing
+  // the style in parens. uPlot's `title` option is plain text only.
+  function buildLegendHeader(lineId) {
+    var header = el('div', {class: 'oee-chart-title'});
+    header.appendChild(el('span', {class: 'oee-chart-line', text: lineId + ' —'}));
+    [
+      {cls: 'oee-key-availability', label: 'Availability'},
+      {cls: 'oee-key-performance',  label: 'Performance'},
+      {cls: 'oee-key-quality',      label: 'Quality'},
+    ].forEach(function (k) {
+      var key = el('span', {class: 'oee-key'});
+      key.appendChild(el('span', {class: 'oee-key-swatch ' + k.cls}));
+      key.appendChild(el('span', {class: 'oee-key-label', text: k.label}));
+      header.appendChild(key);
+    });
+    return header;
+  }
+
   function buildLineChart(containerId, lineId) {
     var container = document.getElementById(containerId);
     if (!container) return null;
+    container.appendChild(buildLegendHeader(lineId));
     var opts = {
       width: container.clientWidth || 400,
       height: 110,
-      title: lineId + ' — Availability (solid blue) · Performance (dashed green) · Quality (dotted yellow)',
       legend: {show: false},
       scales: {y: {auto: false, range: Y_RANGE}},
       series: [

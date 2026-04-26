@@ -85,8 +85,8 @@ def _routes(line_ids: tuple[str, ...], machines: list[dict], alerts: list[dict] 
         "FROM last_cache": machines,
         ("FROM machine_state", "INTERVAL '8 hours'"): _state_agg(line_ids),
         ("FROM part_events", "INTERVAL '8 hours'"): _parts_agg(line_ids),
-        ("FROM machine_state", "INTERVAL '60 minutes'"): _state_hist(line_ids),
-        ("FROM part_events", "INTERVAL '60 minutes'"): _parts_hist(line_ids),
+        ("FROM machine_state", "INTERVAL '10 minutes'"): _state_hist(line_ids),
+        ("FROM part_events", "INTERVAL '10 minutes'"): _parts_hist(line_ids),
         "FROM alerts": alerts or [],
     }
 

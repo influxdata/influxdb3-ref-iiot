@@ -84,6 +84,21 @@ main { padding: 16px 24px; display: flex; flex-direction: column; gap: 16px; }
 
 #oee-charts { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 8px; }
 .oee-chart { width: 100%; }
+.oee-chart-title {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 16px; padding: 4px 0 6px;
+  font-size: 0.9em; color: var(--text-dim);
+}
+.oee-chart-line { color: var(--text); font-weight: 600; }
+.oee-key { display: inline-flex; align-items: center; gap: 8px; }
+.oee-key-swatch {
+  display: inline-block; width: 28px; height: 0;
+  border-top-style: solid; border-top-width: 2px;
+}
+.oee-key-availability { border-top: 2px solid #5ec1ff; }
+.oee-key-performance  { border-top: 2px dashed #a3e635; }
+.oee-key-quality      { border-top: 2px dotted #fbbf24; }
+.oee-key-label { color: var(--text-dim); }
 
 table.alerts { width: 100%; border-collapse: collapse; font-size: 0.9em; }
 table.alerts th, table.alerts td {

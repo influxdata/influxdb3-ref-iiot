@@ -166,11 +166,16 @@ PY
 
 # Curl an arbitrary endpoint, time it, pretty-print JSON, report latency.
 # Use this for the Request-trigger demo so we get true end-to-end timing.
+# Optional second arg truncates output to N lines. Truncation happens via
+# `head -n N <file>` rather than a pipe so the JSON formatter never sees
+# SIGPIPE — important under `set -o pipefail`.
 timed_get_json() {
     local url="$1"
-    local tok body_file
+    local max_lines="${2:-0}"
+    local tok body_file pretty_file
     tok=$(token)
     body_file=$(mktemp)
+    pretty_file=$(mktemp)
     local time_total
     time_total=$(curl -s -w '%{time_total}' \
         -o "$body_file" \
@@ -178,8 +183,15 @@ timed_get_json() {
         "$url")
     local ms
     ms=$(awk -v t="$time_total" 'BEGIN{printf "%.3f", t*1000}')
-    python3 -m json.tool < "$body_file" 2>/dev/null || cat "$body_file"
-    rm -f "$body_file"
+    if ! python3 -m json.tool < "$body_file" > "$pretty_file" 2>/dev/null; then
+        cp "$body_file" "$pretty_file"
+    fi
+    if [[ "$max_lines" -gt 0 ]]; then
+        head -n "$max_lines" "$pretty_file"
+    else
+        cat "$pretty_file"
+    fi
+    rm -f "$body_file" "$pretty_file"
     printf "${FG_TEXT}responded in ${BOLD}${FG_GREEN}%s ms${RESET}${FG_TEXT} ← same endpoint the browser's andon panel hits${RESET}\n" "$ms"
 }
 
@@ -429,8 +441,7 @@ note "The server runs request_andon_board.py inline and returns the full plant v
 note "Same call the browser's andon panel makes — the latency below should match the badge."
 cmd "curl -H 'Authorization: Bearer \$TOKEN' http://localhost:8181/api/v3/engine/andon_board"
 echo "${FG_GREY}│${RESET}"
-timed_get_json "http://localhost:8181/api/v3/engine/andon_board" \
-    | head -60 \
+timed_get_json "http://localhost:8181/api/v3/engine/andon_board" 60 \
     | sed "s|^|${FG_GREY}│${RESET}  |"
 info "(JSON truncated to first 60 lines; full payload contains all 3 lines × 8 stations.)"
 close_step
