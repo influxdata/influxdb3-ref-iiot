@@ -1,5 +1,10 @@
 // IIoT dashboard JS: andon board (direct fetch + latency badge) and per-line OEE charts.
 // Plain JS, no build step. Loaded after htmx.min.js and uplot.min.js.
+//
+// Single fetch per poll: /api/v3/engine/andon_board (Processing Engine plugin)
+// returns BOTH the current per-line state (cells + current OEE) AND a per-line,
+// per-minute history for the last 60 minutes. The cell grid and the breakdown
+// charts share a source of truth — same numbers, same plugin.
 
 (function () {
   'use strict';
@@ -16,7 +21,7 @@
   }
 
   // ------------------------------------------------------------------
-  // Andon board — direct fetch to /api/v3/engine/andon_board
+  // Andon cells
   // ------------------------------------------------------------------
 
   function classForState(s) {
@@ -54,12 +59,74 @@
     });
   }
 
-  function pollAndon() {
+  // ------------------------------------------------------------------
+  // Per-line OEE breakdown chart — driven by line.history from the same payload
+  // ------------------------------------------------------------------
+  //
+  // Y-axis is tightened to [0.7, 1.02] — nominal A/P/Q values cluster near 1.0
+  // and a [0, 1] range buries small dips. The 0.7 floor still shows the kind
+  // of drop a downtime cascade produces (Line 2 OEE dropping to 0.4 will be
+  // visible as a series dropping below the chart, which is louder than a
+  // proportional shrink in a [0, 1] view).
+
+  var Y_RANGE = [0.7, 1.02];
+
+  function buildLineChart(containerId, lineId) {
+    var container = document.getElementById(containerId);
+    if (!container) return null;
+    var opts = {
+      width: container.clientWidth || 400,
+      height: 180,
+      title: lineId + ' — OEE components (Availability · Performance · Quality)',
+      scales: {y: {auto: false, range: Y_RANGE}},
+      series: [
+        {},
+        {label: 'Availability', stroke: '#5ec1ff', width: 2},
+        {label: 'Performance', stroke: '#a3e635', width: 2, dash: [6, 4]},
+        {label: 'Quality',     stroke: '#fbbf24', width: 2, dash: [2, 3]},
+      ],
+      axes: [
+        {scale: 'x'},
+        {scale: 'y', values: function (_, t) { return t.map(function (v) { return (v * 100).toFixed(0) + '%'; }); }},
+      ],
+    };
+    var data = [[], [], [], []];
+    return new uPlot(opts, data, container);
+  }
+
+  function updateChartsFromHistory(charts, lines) {
+    lines.forEach(function (line) {
+      var c = charts[line.line_id];
+      if (!c || !line.history) return;
+      var xs = [], a = [], p = [], q = [];
+      line.history.forEach(function (h) {
+        var ts = Math.floor(new Date(h.bucket).getTime() / 1000);
+        if (!isFinite(ts)) return;
+        xs.push(ts);
+        a.push(h.availability == null ? null : Number(h.availability));
+        p.push(h.performance == null ? null : Number(h.performance));
+        q.push(h.quality == null ? null : Number(h.quality));
+      });
+      c.setData([xs, a, p, q]);
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Single poll loop driving both the cell grid and the breakdown charts
+  // ------------------------------------------------------------------
+
+  function startPolling() {
     var panel = document.getElementById('andon-panel');
     if (!panel) return;
     var url = panel.dataset.andonUrl;
     var token = panel.dataset.andonToken;
     var pollMs = parseInt(panel.dataset.andonPollMs, 10) || 2000;
+
+    var charts = {
+      L1: buildLineChart('chart-l1', 'L1'),
+      L2: buildLineChart('chart-l2', 'L2'),
+      L3: buildLineChart('chart-l3', 'L3'),
+    };
 
     function fetchOnce() {
       var t0 = performance.now();
@@ -70,6 +137,9 @@
           var label = document.getElementById('andon-latency');
           if (label) label.textContent = ms;
           renderAndon(data);
+          if (data && Array.isArray(data.lines)) {
+            updateChartsFromHistory(charts, data.lines);
+          }
         })
         .catch(function (e) {
           var label = document.getElementById('andon-latency');
@@ -82,79 +152,5 @@
     setInterval(fetchOnce, pollMs);
   }
 
-  // ------------------------------------------------------------------
-  // Per-line OEE breakdown — uPlot
-  // ------------------------------------------------------------------
-
-  function buildLineChart(containerId, lineId) {
-    var container = document.getElementById(containerId);
-    if (!container) return null;
-    var opts = {
-      width: container.clientWidth || 400,
-      height: 180,
-      title: lineId + ' — OEE components (Availability · Performance · Quality)',
-      scales: {y: {auto: false, range: [0, 1.05]}},
-      series: [
-        {},
-        {label: 'Availability', stroke: '#5ec1ff'},
-        {label: 'Performance', stroke: '#a3e635'},
-        {label: 'Quality', stroke: '#fbbf24'},
-      ],
-      axes: [
-        {scale: 'x'},
-        {scale: 'y', values: function (_, t) { return t.map(function (v) { return (v * 100).toFixed(0) + '%'; }); }},
-      ],
-    };
-    var data = [[], [], [], []];
-    return new uPlot(opts, data, container);
-  }
-
-  function pollOee() {
-    var panel = document.getElementById('oee-panel');
-    if (!panel) return;
-    var pollMs = parseInt(panel.dataset.oeePollMs, 10) || 5000;
-    var charts = {
-      L1: buildLineChart('chart-l1', 'L1'),
-      L2: buildLineChart('chart-l2', 'L2'),
-      L3: buildLineChart('chart-l3', 'L3'),
-    };
-
-    function bucketize(rows, valueKey) {
-      var byLine = {L1: {x: [], y: []}, L2: {x: [], y: []}, L3: {x: [], y: []}};
-      rows.forEach(function (r) {
-        var lid = r.line_id;
-        if (!byLine[lid]) return;
-        var ts = Math.floor(new Date(r.bucket).getTime() / 1000);
-        byLine[lid].x.push(ts);
-        byLine[lid].y.push(r[valueKey] == null ? 0 : Number(r[valueKey]));
-      });
-      return byLine;
-    }
-
-    function fetchOnce() {
-      fetch('/partials/oee_breakdown')
-        .then(function (r) { return r.json(); })
-        .then(function (payload) {
-          var aL = bucketize(payload.availability, 'availability');
-          var pL = bucketize(payload.performance, 'performance');
-          var qL = bucketize(payload.quality, 'quality');
-          ['L1', 'L2', 'L3'].forEach(function (lid) {
-            var c = charts[lid];
-            if (!c) return;
-            // Use availability x-axis (assume buckets align across queries)
-            var xs = aL[lid].x;
-            c.setData([xs, aL[lid].y, pL[lid].y, qL[lid].y]);
-          });
-        })
-        .catch(function (e) { console.error('oee fetch failed', e); });
-    }
-
-    fetchOnce();
-    setInterval(fetchOnce, pollMs);
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    pollAndon();
-    pollOee();
-  });
+  document.addEventListener('DOMContentLoaded', startPolling);
 })();

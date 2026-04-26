@@ -42,17 +42,6 @@ def test_kpi_distinct_parts_today_uses_distinct_part_id():
     assert "DISTINCT" in sql.upper() and "PART_ID" in sql.upper()
 
 
-def test_per_line_oee_breakdown_queries_have_three_components():
-    a = _normalize(q.per_line_availability_sql(minutes=60))
-    p = _normalize(q.per_line_performance_sql(minutes=60))
-    qq = _normalize(q.per_line_quality_sql(minutes=60))
-    assert "FROM machine_state" in a
-    assert "FROM part_events" in p
-    assert "FROM part_events" in qq
-    for s in (a, p, qq):
-        assert "GROUP BY line_id" in s
-
-
 def test_recent_alerts_query_orders_desc_with_limit():
     sql = _normalize(q.recent_alerts_sql(limit=50))
     assert "FROM alerts" in sql

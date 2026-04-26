@@ -97,52 +97,16 @@ def kpi_plant_oee_current_shift_sql() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Per-line OEE breakdown (uPlot charts)
+# Per-line OEE breakdown
 # ---------------------------------------------------------------------------
-
-
-def per_line_availability_sql(minutes: int = 60) -> str:
-    """Per-line Availability over the last `minutes`. Used by the OEE breakdown chart."""
-    return f"""
-        SELECT
-          line_id,
-          date_bin(INTERVAL '1 minute', time) AS bucket,
-          SUM(CASE WHEN state = 'running' THEN 1 ELSE 0 END) * 1.0
-            / NULLIF(SUM(CASE WHEN state NOT IN ('changeover','planned_maintenance') THEN 1 ELSE 0 END), 0)
-            AS availability
-        FROM machine_state
-        WHERE time > now() - INTERVAL '{minutes} minutes'
-        GROUP BY line_id, bucket
-        ORDER BY bucket
-    """
-
-
-def per_line_performance_sql(minutes: int = 60) -> str:
-    """Per-line Performance over the last `minutes`."""
-    return f"""
-        SELECT
-          line_id,
-          date_bin(INTERVAL '1 minute', time) AS bucket,
-          LEAST(1.0, 30.0 * COUNT(*) * 1.0 / 60.0) AS performance
-        FROM part_events
-        WHERE time > now() - INTERVAL '{minutes} minutes'
-        GROUP BY line_id, bucket
-        ORDER BY bucket
-    """
-
-
-def per_line_quality_sql(minutes: int = 60) -> str:
-    """Per-line Quality over the last `minutes`."""
-    return f"""
-        SELECT
-          line_id,
-          date_bin(INTERVAL '1 minute', time) AS bucket,
-          SUM(CASE WHEN quality = 'good' THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*), 0) AS quality
-        FROM part_events
-        WHERE time > now() - INTERVAL '{minutes} minutes'
-        GROUP BY line_id, bucket
-        ORDER BY bucket
-    """
+# The breakdown chart is fed by the `request_andon_board` Processing Engine
+# plugin, which returns `{lines: [{line_id, history: [{bucket, availability,
+# performance, quality}, ...]}, ...]}`. The browser fetches the andon endpoint
+# directly, so there is no FastAPI partial route or named SQL query for the
+# breakdown chart in this file. See `plugins/request_andon_board.py` for the
+# OEE math (it joins per-minute state and parts aggregates and computes
+# A × P × Q with the line-level Performance correctly normalized by
+# `running_seconds` summed across all running machines on the line).
 
 
 # ---------------------------------------------------------------------------

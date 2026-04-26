@@ -20,7 +20,7 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -149,14 +149,6 @@ def kpi_row(request: Request) -> HTMLResponse:
 def andon_board(request: Request) -> HTMLResponse:
     """Server-rendered shell with the JS hook; the data fetch happens in app.js."""
     return TEMPLATES.TemplateResponse(request, "partials/_andon_board.html", {})
-
-
-@app.get("/partials/oee_breakdown", response_class=JSONResponse)
-def oee_breakdown() -> JSONResponse:
-    a = _query(queries.per_line_availability_sql(60))
-    p = _query(queries.per_line_performance_sql(60))
-    q = _query(queries.per_line_quality_sql(60))
-    return JSONResponse({"availability": a, "performance": p, "quality": q})
 
 
 @app.get("/partials/alerts", response_class=HTMLResponse)

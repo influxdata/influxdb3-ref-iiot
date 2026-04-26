@@ -7,7 +7,11 @@ Returns: {
       "line_id": "L1",
       "oee": 0.873, "availability": 0.92, "performance": 0.97, "quality": 0.99,
       "machines": [{"machine_id": "L1-S1", "state": "running", "reason": ""}, ...],
-      "alerts": [{"time": ..., "machine_id": ..., "severity": ..., "reason": ..., "source": ..., "value": ...}, ...]
+      "alerts": [{"time": ..., "machine_id": ..., "severity": ..., "reason": ..., "source": ..., "value": ...}, ...],
+      "history": [
+        {"bucket": "2026-04-26T13:00:00Z", "availability": 1.0, "performance": 1.0, "quality": 0.99},
+        ...
+      ]
     },
     ...
   ],
@@ -16,15 +20,25 @@ Returns: {
 
 The UI fetches this and shows a "served by Processing Engine: <ms>" badge,
 demonstrating Processing-Engine-mediated APIs replacing a custom backend.
+The browser's per-line OEE breakdown chart consumes `history` directly —
+single fetch drives both the cell grid and the time-series chart.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
 
-# Window for "current shift" KPIs and recent alerts.
+# Window for "current shift" current OEE values and recent alerts.
 SHIFT_WINDOW_SQL = "INTERVAL '8 hours'"
 ALERT_WINDOW_SQL = "INTERVAL '15 minutes'"
+# Historical window for the chart (per-minute buckets).
+HISTORY_WINDOW_SQL = "INTERVAL '60 minutes'"
+HISTORY_BUCKET_SQL = "INTERVAL '1 minute'"
+# Ideal cycle time per machine (seconds). For per-line Performance, the
+# ideal output across N parallel machines for the bucket is N * bucket_seconds
+# / ideal_cycle_s, which equals running_seconds / ideal_cycle_s — so
+# Performance = ideal_cycle_s * total_count / running_seconds.
+IDEAL_CYCLE_S = 30.0
 
 
 def process_request(influxdb3_local, query_parameters, request_headers, request_body, args=None):
@@ -70,6 +84,35 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
         f"WHERE time > now() - {ALERT_WINDOW_SQL} ORDER BY time DESC LIMIT 100"
     )
 
+    # Per-line, per-minute history for the OEE breakdown chart. Two
+    # bucketed aggregates joined in Python on (line_id, bucket).
+    state_hist_rows = influxdb3_local.query(
+        f"""
+        SELECT
+          line_id,
+          date_bin({HISTORY_BUCKET_SQL}, time) AS bucket,
+          SUM(CASE WHEN state = 'running' THEN 1 ELSE 0 END) AS running_seconds,
+          SUM(CASE WHEN state NOT IN ('changeover','planned_maintenance') THEN 1 ELSE 0 END) AS planned_seconds
+        FROM machine_state
+        WHERE time > now() - {HISTORY_WINDOW_SQL}
+        GROUP BY line_id, bucket
+        ORDER BY bucket
+        """
+    )
+    parts_hist_rows = influxdb3_local.query(
+        f"""
+        SELECT
+          line_id,
+          date_bin({HISTORY_BUCKET_SQL}, time) AS bucket,
+          COUNT(*) AS total_count,
+          SUM(CASE WHEN quality = 'good' THEN 1 ELSE 0 END) AS good_count
+        FROM part_events
+        WHERE time > now() - {HISTORY_WINDOW_SQL}
+        GROUP BY line_id, bucket
+        ORDER BY bucket
+        """
+    )
+
     # Group machines by line_id
     by_line: dict[str, list[dict]] = {}
     for r in state_rows:
@@ -99,11 +142,42 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
             }
         )
 
-    # Per-line OEE (use ideal cycle 30s; real value should come from per-machine
-    # config but for this reference we use the fleet default)
-    ideal_cycle_s = 30.0
+    # Index aggregates and history by line_id (and (line_id, bucket) for history).
     state_by_line = {str(r["line_id"]): r for r in state_agg_rows}
     parts_by_line = {str(r["line_id"]): r for r in parts_agg_rows}
+    state_hist = {(str(r["line_id"]), str(r["bucket"])): r for r in state_hist_rows}
+    parts_hist = {(str(r["line_id"]), str(r["bucket"])): r for r in parts_hist_rows}
+
+    def _compute_oee(running_s: float, planned_s: float, total: float, good: float) -> dict:
+        availability = (running_s / planned_s) if planned_s > 0 else 0.0
+        performance = (
+            min(1.0, (IDEAL_CYCLE_S * total) / running_s) if running_s > 0 else 0.0
+        )
+        quality = (good / total) if total > 0 else 0.0
+        return {
+            "availability": round(availability, 4),
+            "performance": round(performance, 4),
+            "quality": round(quality, 4),
+            "oee": round(availability * performance * quality, 4),
+        }
+
+    def _history_for(line_id: str) -> list[dict]:
+        # Union of buckets from both queries — a bucket present in one but not
+        # the other is still rendered (with the missing side defaulting to 0).
+        buckets = sorted({b for (lid, b) in state_hist if lid == line_id} |
+                         {b for (lid, b) in parts_hist if lid == line_id})
+        out = []
+        for b in buckets:
+            sh = state_hist.get((line_id, b)) or {}
+            ph = parts_hist.get((line_id, b)) or {}
+            comp = _compute_oee(
+                float(sh.get("running_seconds") or 0),
+                float(sh.get("planned_seconds") or 0),
+                float(ph.get("total_count") or 0),
+                float(ph.get("good_count") or 0),
+            )
+            out.append({"bucket": b, **comp})
+        return out
 
     lines_out = []
     for line_id in sorted(by_line):
@@ -111,23 +185,19 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
         machines.sort(key=lambda m: m["station_id"])
         sl = state_by_line.get(line_id) or {}
         pl = parts_by_line.get(line_id) or {}
-        running_s = float(sl.get("running_seconds") or 0)
-        planned_s = float(sl.get("planned_seconds") or 0)
-        total = float(pl.get("total_count") or 0)
-        good = float(pl.get("good_count") or 0)
-        availability = (running_s / planned_s) if planned_s > 0 else 0.0
-        performance = min(1.0, (ideal_cycle_s * total) / running_s) if running_s > 0 else 0.0
-        quality = (good / total) if total > 0 else 0.0
-        oee = availability * performance * quality
+        comp = _compute_oee(
+            float(sl.get("running_seconds") or 0),
+            float(sl.get("planned_seconds") or 0),
+            float(pl.get("total_count") or 0),
+            float(pl.get("good_count") or 0),
+        )
         lines_out.append(
             {
                 "line_id": line_id,
-                "oee": round(oee, 4),
-                "availability": round(availability, 4),
-                "performance": round(performance, 4),
-                "quality": round(quality, 4),
+                **comp,
                 "machines": machines,
                 "alerts": alerts_by_line.get(line_id, []),
+                "history": _history_for(line_id),
             }
         )
 
