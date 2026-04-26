@@ -94,13 +94,28 @@
     return new uPlot(opts, data, container);
   }
 
+  // Buckets come back as either a ns-integer string ("1777217040000000000")
+  // — that's what InfluxDB's date_bin() emits over the wire — or an ISO
+  // datetime string from a future formatting pass. Handle both. Returns
+  // seconds-since-epoch (uPlot's x-scale unit), or NaN if unparseable.
+  function bucketToSeconds(bucket) {
+    if (bucket == null) return NaN;
+    if (typeof bucket === 'number') return bucket / 1000;
+    var s = String(bucket);
+    if (/^\d{16,}$/.test(s)) return Number(s) / 1e9;        // ns integer
+    if (/^\d{13}$/.test(s))  return Number(s) / 1e3;        // ms integer
+    if (/^\d{10}$/.test(s))  return Number(s);              // s integer
+    var t = Date.parse(s);
+    return isFinite(t) ? t / 1000 : NaN;
+  }
+
   function updateChartsFromHistory(charts, lines) {
     lines.forEach(function (line) {
       var c = charts[line.line_id];
       if (!c || !line.history) return;
       var xs = [], a = [], p = [], q = [];
       line.history.forEach(function (h) {
-        var ts = Math.floor(new Date(h.bucket).getTime() / 1000);
+        var ts = bucketToSeconds(h.bucket);
         if (!isFinite(ts)) return;
         xs.push(ts);
         a.push(h.availability == null ? null : Number(h.availability));

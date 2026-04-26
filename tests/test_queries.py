@@ -16,11 +16,14 @@ def _normalize(sql: str) -> str:
     return re.sub(r"\s+", " ", sql).strip()
 
 
-def test_plant_state_query_targets_machine_state():
+def test_plant_state_query_uses_lvc():
     sql = _normalize(q.plant_state_sql())
-    assert "FROM machine_state" in sql
-    # Plant state ranks state severity; uses LVC (no time filter required)
+    # Reads the LVC via last_cache(...) so we get one row per machine
+    # rather than one row per tick.
+    assert "last_cache('machine_state', 'machine_state_last')" in sql
     assert "machine_id" in sql
+    # __init seed row is filtered out so it doesn't pollute the banner counts.
+    assert "__init" in sql
 
 
 def test_kpi_units_last_window_query_filters_part_events():

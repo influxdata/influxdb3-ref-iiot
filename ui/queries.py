@@ -20,15 +20,18 @@ def plant_state_sql() -> str:
     """Return the latest state for every machine.
 
     Used by: GET /partials/plant_state -> _plant_state.html
-    Result rows: {machine_id, state}
-    Why: A WHERE clause matching the LVC key columns (site, line_id,
-        station_id, machine_id) auto-routes through the LVC, returning
-        24 rows in sub-millisecond.
+    Result rows: {machine_id, state}  (24 rows, one per machine)
+    Why: Reads the LVC via the `last_cache(table, cache_name)` table-valued
+        function, which returns one row per cache-key combination — 24 rows
+        for the 24 machines, sub-millisecond. A plain SELECT against
+        machine_state would scan the whole table and count every tick.
+        The site <> '__init' filter excludes the sentinel row init.sh
+        writes at t=1ns to make the table exist before the simulator boots.
     """
     return """
         SELECT machine_id, state
-        FROM machine_state
-        WHERE site = 'acme-main'
+        FROM last_cache('machine_state', 'machine_state_last')
+        WHERE site = 'acme-main' AND site <> '__init'
         ORDER BY machine_id
     """
 
