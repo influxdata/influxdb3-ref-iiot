@@ -1,0 +1,154 @@
+name: influxdb3-ref-iiot
+
+services:
+  # One-shot: generate an offline admin token on first boot. The server
+  # needs one via --admin-token-file; the recovery endpoint can only
+  # REGENERATE existing tokens, not create the first one.
+  token-bootstrap:
+    image: influxdb:3-enterprise
+    container_name: iiot-token-bootstrap
+    environment:
+      INFLUXDB3_UNSET_VARS: LOG_FILTER
+      INFLUXDB3_LOG_FILTER: info
+    volumes:
+      - influxdb-data:/var/lib/influxdb3
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        if [ -s /var/lib/influxdb3/.iiot-operator-token ]; then
+          echo "[bootstrap] admin token already exists, skipping"
+          exit 0
+        fi
+        echo "[bootstrap] generating offline admin token"
+        influxdb3 create token --admin --offline \
+          --name iiot-admin \
+          --output-file /var/lib/influxdb3/.iiot-operator-token
+        chmod 600 /var/lib/influxdb3/.iiot-operator-token
+        echo "[bootstrap] admin token written"
+    restart: "no"
+
+  influxdb3:
+    image: influxdb:3-enterprise
+    container_name: iiot-influxdb3
+    depends_on:
+      token-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      INFLUXDB3_ENTERPRISE_LICENSE_EMAIL: ${INFLUXDB3_ENTERPRISE_EMAIL:?set INFLUXDB3_ENTERPRISE_EMAIL in .env}
+      INFLUXDB3_ENTERPRISE_LICENSE_TYPE: ${INFLUXDB3_ENTERPRISE_LICENSE_TYPE:-trial}
+      INFLUXDB3_PLUGIN_DIR: /plugins
+      INFLUXDB3_NODE_IDENTIFIER_PREFIX: iiot-node
+      INFLUXDB3_OBJECT_STORE: file
+      INFLUXDB3_DATA_DIR: /var/lib/influxdb3
+      INFLUXDB3_UNSET_VARS: LOG_FILTER
+      INFLUXDB3_LOG_FILTER: info
+    command: >
+      serve
+        --node-id iiot-node0
+        --cluster-id iiot
+        --mode all
+        --object-store file
+        --data-dir /var/lib/influxdb3
+        --plugin-dir /plugins
+        --virtual-env-location /var/lib/influxdb3/plugin-venv
+        --admin-token-file /var/lib/influxdb3/.iiot-operator-token
+        --admin-token-recovery-http-bind 0.0.0.0:8182
+    volumes:
+      - influxdb-data:/var/lib/influxdb3
+      - ./plugins:/plugins:ro
+      - ./influxdb/init.sh:/usr/local/bin/iiot-init.sh:ro
+    ports:
+      - "8181:8181"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s --max-time 2 -o /dev/null http://127.0.0.1:8181/health && test -s /var/lib/influxdb3/.iiot-operator-token"]
+      interval: 5s
+      timeout: 3s
+      retries: 120
+      start_period: 5s
+
+  influxdb3-init:
+    image: influxdb:3-enterprise
+    container_name: iiot-influxdb3-init
+    depends_on:
+      influxdb3:
+        condition: service_started
+    environment:
+      INFLUXDB3_UNSET_VARS: LOG_FILTER
+      INFLUXDB3_LOG_FILTER: info
+    volumes:
+      - influxdb-data:/var/lib/influxdb3
+      - ./influxdb/init.sh:/usr/local/bin/iiot-init.sh:ro
+      - ./plugins:/plugins:ro
+    entrypoint: ["/usr/local/bin/iiot-init.sh"]
+    restart: "no"
+
+  simulator:
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    container_name: iiot-simulator
+    depends_on:
+      influxdb3:
+        condition: service_healthy
+      influxdb3-init:
+        condition: service_completed_successfully
+    environment:
+      INFLUX_URL: http://influxdb3:8181
+      INFLUX_DB: iiot
+      INFLUX_TOKEN_FILE: /tokens/.iiot-operator-token
+      SIM_RATE_HZ: ${SIM_RATE_HZ:-1.0}
+      SIM_SEED: ${SIM_SEED:-42}
+      SIM_LINES: ${SIM_LINES:-3}
+      SIM_STATIONS_PER_LINE: ${SIM_STATIONS_PER_LINE:-8}
+      SIM_NOMINAL_CYCLE_S: ${SIM_NOMINAL_CYCLE_S:-30.0}
+    command: ["python", "-m", "simulator.main"]
+    volumes:
+      - influxdb-data:/tokens:ro
+
+  ui:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    container_name: iiot-ui
+    depends_on:
+      influxdb3:
+        condition: service_healthy
+      influxdb3-init:
+        condition: service_completed_successfully
+    environment:
+      INFLUX_URL: http://influxdb3:8181
+      INFLUX_DB: iiot
+      INFLUX_TOKEN_FILE: /tokens/.iiot-operator-token
+      UI_KPI_POLL_MS: ${UI_KPI_POLL_MS:-2000}
+      UI_ANDON_POLL_MS: ${UI_ANDON_POLL_MS:-2000}
+      UI_OEE_POLL_MS: ${UI_OEE_POLL_MS:-5000}
+      UI_ALERTS_POLL_MS: ${UI_ALERTS_POLL_MS:-3000}
+    command: ["uvicorn", "ui.app:app", "--host", "0.0.0.0", "--port", "8080"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - influxdb-data:/tokens:ro
+
+  scenarios:
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    container_name: iiot-scenarios
+    profiles: ["scenarios"]
+    depends_on:
+      influxdb3:
+        condition: service_healthy
+      influxdb3-init:
+        condition: service_completed_successfully
+    environment:
+      INFLUX_URL: http://influxdb3:8181
+      INFLUX_DB: iiot
+      INFLUX_TOKEN_FILE: /tokens/.iiot-operator-token
+      SCENARIO: ${SCENARIO:-}
+    volumes:
+      - influxdb-data:/tokens:ro
+    entrypoint: ["sh", "-c", "test -n \"$$SCENARIO\" || { echo 'SCENARIO env var not set' >&2; exit 2; }; exec python -m simulator.scenarios.$$SCENARIO"]
+    restart: "no"
+
+volumes:
+  influxdb-data:
