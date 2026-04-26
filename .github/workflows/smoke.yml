@@ -1,0 +1,28 @@
+name: smoke
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 7 * * *"  # nightly 07:00 UTC
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore license-validated influxdb-data volume
+        uses: actions/download-artifact@v4
+        with:
+          name: influxdb-data-validated
+          path: ./.ci-volume
+        continue-on-error: true   # if the artifact is missing, smoke is skipped
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e ".[dev]"
+      - run: |
+          if [ ! -d .ci-volume ]; then
+            echo "no validated volume artifact; skipping smoke"; exit 0
+          fi
+          docker volume create iiot_influxdb-data
+          docker run --rm -v iiot_influxdb-data:/data -v "$PWD/.ci-volume":/src busybox sh -c "cp -r /src/. /data/"
+          export INFLUXDB3_ENTERPRISE_EMAIL=ci+iiot@example.com
+          pytest tests/test_smoke.py -q -m smoke
