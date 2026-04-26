@@ -1,0 +1,21 @@
+<section class="panel">
+  <header class="panel-header"><h2>Recent alerts</h2></header>
+  <table class="alerts">
+    <thead><tr><th>Time</th><th>Source</th><th>Severity</th><th>Line</th><th>Machine</th><th>Reason</th><th>Value</th></tr></thead>
+    <tbody>
+      {% for a in alerts %}
+      <tr class="sev-{{ a.severity }}">
+        <td>{{ a.time }}</td>
+        <td>{{ a.source }}</td>
+        <td>{{ a.severity }}</td>
+        <td>{{ a.line_id }}</td>
+        <td>{{ a.machine_id }}</td>
+        <td>{{ a.reason }}</td>
+        <td>{{ "%.3f"|format(a.value or 0.0) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">no alerts in last 24h</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>

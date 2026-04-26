@@ -1,0 +1,22 @@
+<div class="kpi-row">
+  <div class="kpi-tile">
+    <div class="kpi-label">Plant OEE</div>
+    <div class="kpi-value">{{ plant_oee_pct }}%</div>
+    <div class="kpi-sub">last 8h rolling</div>
+  </div>
+  <div class="kpi-tile">
+    <div class="kpi-label">Units</div>
+    <div class="kpi-value">{{ units_last_hour }}</div>
+    <div class="kpi-sub">last 60 min</div>
+  </div>
+  <div class="kpi-tile">
+    <div class="kpi-label">Active alerts</div>
+    <div class="kpi-value">{{ active_alerts }}</div>
+    <div class="kpi-sub">last 60 min</div>
+  </div>
+  <div class="kpi-tile">
+    <div class="kpi-label">Distinct parts today</div>
+    <div class="kpi-value">{{ distinct_parts_today }}</div>
+    <div class="kpi-sub">via Distinct Value Cache</div>
+  </div>
+</div>

@@ -1,0 +1,8 @@
+<div class="banner banner-{{ plant_state | lower }}">
+  <span class="banner-label">PLANT STATE</span>
+  <span class="banner-value">{{ plant_state }}</span>
+  <span class="banner-detail">
+    running: {{ counts.running }} · stopped: {{ counts.stopped }} · error: {{ counts.error }}
+    · idle: {{ counts.idle }} · changeover: {{ counts.changeover }} · planned: {{ counts.planned_maintenance }}
+  </span>
+</div>
