@@ -1,0 +1,27 @@
+flowchart LR
+  subgraph Plant["Plant: ACME-MAIN"]
+    L1[Line 1<br/>8 stations]
+    L2[Line 2<br/>8 stations]
+    L3[Line 3<br/>8 stations]
+  end
+  Plant -->|line protocol over HTTP| Sim[Simulator]
+  Sim -->|writes| Influx[(InfluxDB 3<br/>Enterprise)]
+
+  subgraph Influx
+    LVC[(Last Value Cache<br/>machine_state)]
+    DVC[(Distinct Value Cache<br/>part_events.part_id)]
+    Tables[(machine_state, vibration,<br/>temperature, part_events,<br/>alerts, shift_summary)]
+  end
+
+  Influx -->|WAL events| WAL1[wal_downtime_detector]
+  Influx -->|WAL events| WAL2[wal_quality_excursion]
+  Influx -->|cron| Sched[schedule_shift_summary]
+  Influx -->|HTTP| Req[request_andon_board]
+
+  WAL1 -->|writes| Influx
+  WAL2 -->|writes| Influx
+  Sched -->|writes| Influx
+
+  UI[FastAPI + HTMX + uPlot UI]
+  UI -->|SQL via partials| Influx
+  UI -.->|direct fetch w/ latency badge| Req
