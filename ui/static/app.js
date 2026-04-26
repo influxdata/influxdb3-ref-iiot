@@ -76,8 +76,9 @@
     if (!container) return null;
     var opts = {
       width: container.clientWidth || 400,
-      height: 180,
-      title: lineId + ' — OEE components (Availability · Performance · Quality)',
+      height: 110,
+      title: lineId + ' — Availability (solid blue) · Performance (dashed green) · Quality (dotted yellow)',
+      legend: {show: false},
       scales: {y: {auto: false, range: Y_RANGE}},
       series: [
         {},
