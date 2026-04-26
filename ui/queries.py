@@ -25,13 +25,11 @@ def plant_state_sql() -> str:
         function, which returns one row per cache-key combination — 24 rows
         for the 24 machines, in single-digit ms. A plain SELECT against
         machine_state would scan the whole table and count every tick.
-        The site <> '__init' filter excludes the sentinel row init.sh
-        writes at t=1ns to make the table exist before the simulator boots.
     """
     return """
         SELECT machine_id, state
         FROM last_cache('machine_state', 'machine_state_last')
-        WHERE site = 'acme-main' AND site <> '__init'
+        WHERE site = 'acme-main'
         ORDER BY machine_id
     """
 

@@ -63,31 +63,98 @@ ensure_database() {
 }
 
 # Caches and several UI queries reference tables by name and require them
-# to EXIST at query/create time. Seed each user table with one sentinel row
-# at timestamp 1 ns (1970-01-01 — outside every recent-time window the UI
-# queries) using tag sets the simulator/plugins never emit.
-ensure_seed_tables() {
+# to EXIST at cache-create / query-plan time. Create each user table
+# explicitly via POST /api/v3/configure/table so the schema is registered
+# before the simulator (and plugins that read those tables) start. The
+# alternative — implicit table creation by first write — leaves a race
+# window where the LVC/DVC `create` calls and UI queries can fail with
+# "table not found".
+create_table() {
+    local table="$1"
+    local body="$2"
     local token
     token=$(read_token_json "${TOKEN_FILE}")
-    local seeds=(
-        'machine_state,site=__init,line_id=__init,station_id=__init,machine_id=__init state="__init",reason="__init" 1'
-        'temperature,site=__init,line_id=__init,station_id=__init,machine_id=__init temp_c=0 1'
-        'vibration,site=__init,line_id=__init,station_id=__init,machine_id=__init rms_mm_s=0 1'
-        'part_events,site=__init,line_id=__init,station_id=__init,machine_id=__init,part_id=__init,quality=__init cycle_time_s=0 1'
-        'alerts,source=__init,severity=__init,line_id=__init,machine_id=__init reason="__init",value=0 1'
-        'shift_summary,line_id=__init,shift_id=__init oee=0,availability=0,performance=0,quality=0,units_total=0,units_good=0,downtime_top1_reason="__init",downtime_top2_reason="__init",downtime_top3_reason="__init",downtime_top1_seconds=0,downtime_top2_seconds=0,downtime_top3_seconds=0 1'
-    )
-    local body
-    body=$(printf '%s\n' "${seeds[@]}")
-    if curl -sf -X POST \
-            "${INFLUX_HOST}/api/v3/write_lp?db=${INFLUX_DB}&precision=nanosecond" \
-            -H "Authorization: Bearer ${token}" \
-            -H "Content-Type: text/plain" \
-            --data "${body}" >/dev/null 2>&1; then
-        log "seeded all user tables"
-    else
-        log "sentinel writes may have failed (table-already-exists is fine); continuing"
-    fi
+    local out code
+    out=$(mktemp)
+    code=$(curl -s -o "${out}" -w "%{http_code}" -X POST \
+        "${INFLUX_HOST}/api/v3/configure/table" \
+        -H "Authorization: Bearer ${token}" \
+        -H "Content-Type: application/json" \
+        --data "${body}")
+    case "${code}" in
+        200|201|204) log "created table ${table}" ;;
+        409)         log "table ${table} already exists" ;;
+        *)
+            echo "[init] FATAL while creating table ${table} (HTTP ${code}): $(cat "${out}")" >&2
+            rm -f "${out}"
+            exit 1
+            ;;
+    esac
+    rm -f "${out}"
+}
+
+ensure_user_tables() {
+    create_table machine_state '{
+        "db": "'"${INFLUX_DB}"'",
+        "table": "machine_state",
+        "tags": ["site", "line_id", "station_id", "machine_id"],
+        "fields": [
+            {"name": "state",  "type": "utf8"},
+            {"name": "reason", "type": "utf8"}
+        ]
+    }'
+    create_table temperature '{
+        "db": "'"${INFLUX_DB}"'",
+        "table": "temperature",
+        "tags": ["site", "line_id", "station_id", "machine_id"],
+        "fields": [
+            {"name": "temp_c", "type": "float64"}
+        ]
+    }'
+    create_table vibration '{
+        "db": "'"${INFLUX_DB}"'",
+        "table": "vibration",
+        "tags": ["site", "line_id", "station_id", "machine_id"],
+        "fields": [
+            {"name": "rms_mm_s", "type": "float64"}
+        ]
+    }'
+    create_table part_events '{
+        "db": "'"${INFLUX_DB}"'",
+        "table": "part_events",
+        "tags": ["site", "line_id", "station_id", "machine_id", "part_id", "quality"],
+        "fields": [
+            {"name": "cycle_time_s", "type": "float64"}
+        ]
+    }'
+    create_table alerts '{
+        "db": "'"${INFLUX_DB}"'",
+        "table": "alerts",
+        "tags": ["source", "severity", "line_id", "machine_id"],
+        "fields": [
+            {"name": "reason", "type": "utf8"},
+            {"name": "value",  "type": "float64"}
+        ]
+    }'
+    create_table shift_summary '{
+        "db": "'"${INFLUX_DB}"'",
+        "table": "shift_summary",
+        "tags": ["line_id", "shift_id"],
+        "fields": [
+            {"name": "oee",                   "type": "float64"},
+            {"name": "availability",          "type": "float64"},
+            {"name": "performance",           "type": "float64"},
+            {"name": "quality",               "type": "float64"},
+            {"name": "units_total",           "type": "float64"},
+            {"name": "units_good",            "type": "float64"},
+            {"name": "downtime_top1_reason",  "type": "utf8"},
+            {"name": "downtime_top2_reason",  "type": "utf8"},
+            {"name": "downtime_top3_reason",  "type": "utf8"},
+            {"name": "downtime_top1_seconds", "type": "float64"},
+            {"name": "downtime_top2_seconds", "type": "float64"},
+            {"name": "downtime_top3_seconds", "type": "float64"}
+        ]
+    }'
 }
 
 ensure_caches() {
@@ -142,7 +209,7 @@ main() {
     wait_for_api
     ensure_token
     ensure_database
-    ensure_seed_tables
+    ensure_user_tables
     ensure_caches
     ensure_triggers
     log "initialization complete"

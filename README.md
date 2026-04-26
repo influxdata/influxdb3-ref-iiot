@@ -68,6 +68,11 @@ the JSON response. See `cache-last-compare` in `CLI_EXAMPLES.md`.
 `distinct part_id` over today (~700K events at default config) returns in a few ms via the cache (vs. hundreds of ms scanning the table); exact latency depends on the query.
 See `cache-distinct` in `CLI_EXAMPLES.md`.
 
+> The LVC and DVC are bound to a *named* table that must already exist when
+> `create last_cache` / `create distinct_cache` runs. `init.sh` creates each
+> user table explicitly via `POST /api/v3/configure/table` before creating the
+> caches — see `ARCHITECTURE.md` § "Table creation: explicit, not implicit".
+
 ### ⬢ Custom UI calling Processing Engine directly
 
 > **⚡ The andon-board panel calls the `request_andon_board` plugin via `fetch` directly

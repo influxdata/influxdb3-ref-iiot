@@ -22,8 +22,7 @@ def test_plant_state_query_uses_lvc():
     # rather than one row per tick.
     assert "last_cache('machine_state', 'machine_state_last')" in sql
     assert "machine_id" in sql
-    # __init seed row is filtered out so it doesn't pollute the banner counts.
-    assert "__init" in sql
+    assert "site = 'acme-main'" in sql
 
 
 def test_kpi_units_last_window_query_filters_part_events():

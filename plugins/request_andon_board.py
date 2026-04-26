@@ -43,13 +43,11 @@ IDEAL_CYCLE_S = 30.0
 
 def process_request(influxdb3_local, query_parameters, request_headers, request_body, args=None):
     # Latest state per machine via the LVC. last_cache() is a table-valued
-    # function returning one row per cache-key combination (24 machines + 1
-    # __init seed row that init.sh writes at t=1ns to make the table exist
-    # before the simulator boots; filter the seed out here).
+    # function returning one row per cache-key combination — 24 rows for
+    # the 24 machines.
     state_rows = influxdb3_local.query(
         "SELECT site, line_id, station_id, machine_id, state, reason "
         "FROM last_cache('machine_state', 'machine_state_last') "
-        "WHERE site <> '__init' "
         "ORDER BY line_id, station_id"
     )
 

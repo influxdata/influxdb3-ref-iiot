@@ -113,6 +113,20 @@ across batches). Both patterns recur throughout IIoT.
 | Request trigger | `request_andon_board` powers the UI's andon panel via direct fetch (with latency badge) |
 | Custom UI | FastAPI + HTMX + Jinja2 + uPlot dashboard — no backend service for the andon view |
 
+### Table creation: explicit, not implicit
+
+InfluxDB 3 auto-creates tables on first write, but caches and named queries need
+the table to **exist at create / plan time**. `init.sh` therefore POSTs each user
+table to `/api/v3/configure/table` (passing tags + typed fields as JSON) before
+creating the LVC/DVC and before the simulator starts writing. A 409 on re-run is
+treated as success, so init is idempotent. Without this, the LVC/DVC `create`
+calls — and any UI query that fires before the simulator's first batch lands —
+race against implicit creation and intermittently fail with "table not found".
+
+This replaces an earlier pattern that wrote a `__init` sentinel row at `t=1ns`
+to each table to materialize it; that approach leaked a throwaway row that every
+downstream query had to filter out.
+
 ## 8. Token bootstrap
 
 The `token-bootstrap` compose service generates an offline admin token on first boot,
