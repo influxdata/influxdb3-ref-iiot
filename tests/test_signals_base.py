@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
 
 from simulator.signals_base import burst, jitter, random_walk, sinusoid, step
