@@ -88,7 +88,7 @@ Four ingest tables, one alert table, one rollup table.
 
 ### 3.1 Caches
 
-- **Last Value Cache** on `machine_state` keyed by `(site, line_id, station_id, machine_id)`. 24-row lookup serves the andon board grid and the plant-state banner in sub-millisecond.
+- **Last Value Cache** on `machine_state` keyed by `(site, line_id, station_id, machine_id)`. 24-row lookup serves the andon board grid and the plant-state banner in single-digit ms.
 - **Distinct Value Cache** on `part_events.part_id`. Powers the "distinct parts today" KPI tile and tag-completion in queries; demonstrates DVC value at high event cardinality (~700K parts/day at default config).
 
 ### 3.2 Retention
@@ -379,7 +379,7 @@ Per portfolio § 8 (IIoT row): common core + Distinct Cache + Request trigger.
 | Feature | Where it shows up |
 |---------|-------------------|
 | Ingest | Simulator writes ~300 pts/s across 4 tables. |
-| **Last Value Cache** | Powers the plant-state banner directly and the andon board indirectly (the `request_andon_board` plugin reads the LVC to assemble its JSON response); sub-ms reads on the 24-row machine-state set. |
+| **Last Value Cache** | Powers the plant-state banner directly and the andon board indirectly (the `request_andon_board` plugin reads the LVC to assemble its JSON response); single-digit-ms reads on the 24-row machine-state set. |
 | **Distinct Value Cache** | Powers "distinct parts today" KPI; demonstrated explicitly in `cache-distinct` CLI example with timing comparison. |
 | **WAL trigger** (×2) | `wal_downtime_detector` (transition-detect), `wal_quality_excursion` (windowed). |
 | **Schedule trigger** | `schedule_shift_summary` rolls up per-line OEE every 8 hours. |

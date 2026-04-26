@@ -211,7 +211,7 @@ echo
 echo "    ${BOLD}${FG_YELLOW}◆${RESET}  ${BOLD}Last Value Cache  +  Distinct Value Cache${RESET}"
 echo "       ${FG_TEXT}LVC on machine_state powers the plant banner and the andon plugin's${RESET}"
 echo "       ${FG_TEXT}24-row lookup. DVC on part_events.part_id makes 'distinct parts today'${RESET}"
-echo "       ${FG_TEXT}sub-millisecond against ~700K events/day.${RESET}"
+echo "       ${FG_TEXT}return in single-digit ms against ~700K events/day.${RESET}"
 echo
 echo "    ${BOLD}${FG_YELLOW}◆${RESET}  ${BOLD}OEE = Availability × Performance × Quality${RESET}"
 echo "       ${FG_TEXT}Computed live in SQL from machine_state + part_events. The schedule${RESET}"
@@ -261,7 +261,7 @@ echo "       ${FG_TEXT}see the latency yourself.${RESET}"
 echo
 echo "  ${FG_CYAN}6.${RESET} ${FG_GREEN}[script]${RESET} -> ${FG_YELLOW}[db]${RESET} ${BOLD}Read the Last Value Cache${RESET} (script SQL)."
 echo "       ${FG_TEXT}'SELECT COUNT(*) FROM last_cache(...)' returns instantly from memory.${RESET}"
-echo "       ${FG_TEXT}24 rows (one per machine), sub-millisecond — same cache the andon plugin${RESET}"
+echo "       ${FG_TEXT}24 rows (one per machine), single-digit ms — same cache the andon plugin${RESET}"
 echo "       ${FG_TEXT}reads on every request and the plant banner reads every 2s.${RESET}"
 echo
 if [[ $PAUSE -eq 1 ]]; then
@@ -436,7 +436,7 @@ info "(JSON truncated to first 60 lines; full payload contains all 3 lines × 8 
 close_step
 
 # ── LVC ──────────────────────────────────────────────────────────────────
-step "Last Value Cache — 24 machines, sub-millisecond"
+step "Last Value Cache — 24 machines, single-digit ms"
 note "Read via the table-valued function last_cache('machine_state','machine_state_last')."
 note "Same cache request_andon_board reads on every request (and the plant banner every 2s)."
 cmd "SELECT COUNT(*) AS machines_in_cache FROM last_cache('machine_state','machine_state_last')"

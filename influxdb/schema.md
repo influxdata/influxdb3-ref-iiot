@@ -18,7 +18,7 @@ triggers.
 
 ## Caches
 
-- **Last Value Cache** `machine_state_last` on `machine_state` keyed by (site, line_id, station_id, machine_id) — 24-row in-memory cache that powers the plant-state banner and is read by `request_andon_board` to assemble the andon JSON. Sub-millisecond per-machine lookup.
+- **Last Value Cache** `machine_state_last` on `machine_state` keyed by (site, line_id, station_id, machine_id) — 24-row in-memory cache that powers the plant-state banner and is read by `request_andon_board` to assemble the andon JSON. Single-digit-ms per-machine lookup (exact latency depends on the query).
 - **Distinct Value Cache** `part_id_distinct` on `part_events.part_id` — accelerates the "distinct parts today" KPI. Demonstrated explicitly in `cache-distinct` CLI example.
 
 ## Retention

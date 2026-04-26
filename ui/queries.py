@@ -23,7 +23,7 @@ def plant_state_sql() -> str:
     Result rows: {machine_id, state}  (24 rows, one per machine)
     Why: Reads the LVC via the `last_cache(table, cache_name)` table-valued
         function, which returns one row per cache-key combination — 24 rows
-        for the 24 machines, sub-millisecond. A plain SELECT against
+        for the 24 machines, in single-digit ms. A plain SELECT against
         machine_state would scan the whole table and count every tick.
         The site <> '__init' filter excludes the sentinel row init.sh
         writes at t=1ns to make the table exist before the simulator boots.

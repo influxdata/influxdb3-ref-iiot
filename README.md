@@ -58,14 +58,14 @@ make demo
 Two WAL plugins, intentionally — they show two different patterns: instant transition-detect
 vs windowed/derivative. See `ARCHITECTURE.md` § "Processing Engine triggers".
 
-### ⬢ Last Value Cache — sub-ms reads on the 24-row machine_state set
+### ⬢ Last Value Cache — single-digit-ms reads on the 24-row machine_state set
 
 Powers the plant-state banner directly and is read by `request_andon_board` to assemble
 the JSON response. See `cache-last-compare` in `CLI_EXAMPLES.md`.
 
 ### ⬢ Distinct Value Cache — fast distinct-count on high-cardinality tags
 
-`distinct part_id` over today (~700K events at default config) is sub-ms via the cache.
+`distinct part_id` over today (~700K events at default config) returns in a few ms via the cache (vs. hundreds of ms scanning the table); exact latency depends on the query.
 See `cache-distinct` in `CLI_EXAMPLES.md`.
 
 ### ⬢ Custom UI calling Processing Engine directly

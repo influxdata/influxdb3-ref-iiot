@@ -48,8 +48,9 @@ See `influxdb/schema.md` for the table reference. Tags are `site`, `line_id`, `s
 - **`vibration` separate from `temperature`** because vibration is 10× the rate. Mixing
   them would produce NULL-heavy rows and waste columnar storage.
 - **`part_events` uses `part_id` as a high-cardinality tag**, demonstrating the Distinct
-  Value Cache. ~700K parts/day at default config; the DVC makes "distinct parts today"
-  sub-millisecond regardless of total table size.
+  Value Cache. ~700K parts/day at default config; the DVC keeps "distinct parts today"
+  in the single-digit-ms range regardless of total table size (exact latency depends on
+  the query).
 - **Pack-level rollups in `shift_summary`** rather than re-aggregating raw rows on every
   query: the schedule plugin writes once per shift; downstream consumers (BI, reporting)
   query the rollup directly. Materialized-downsample pattern.
