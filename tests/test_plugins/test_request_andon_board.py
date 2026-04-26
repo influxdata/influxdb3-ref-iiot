@@ -47,6 +47,16 @@ def _machine(line_id: str, station_id: str, state: str) -> dict:
     }
 
 
+def _state_agg(line_ids: tuple[str, ...]) -> list[dict]:
+    return [
+        {"line_id": lid, "running_seconds": 3000, "planned_seconds": 3600} for lid in line_ids
+    ]
+
+
+def _parts_agg(line_ids: tuple[str, ...]) -> list[dict]:
+    return [{"line_id": lid, "total_count": 100, "good_count": 99} for lid in line_ids]
+
+
 def test_returns_three_lines_eight_stations_each():
     mod = _load_plugin()
     machines = []
@@ -55,30 +65,9 @@ def test_returns_three_lines_eight_stations_each():
             machines.append(_machine(li, si, "running"))
     fake = CannedInflux(
         {
-            "FROM machine_state": machines,
-            "FROM part_events": [
-                {
-                    "line_id": "L1",
-                    "total_count": 100,
-                    "good_count": 99,
-                    "running_seconds": 3000,
-                    "planned_seconds": 3600,
-                },
-                {
-                    "line_id": "L2",
-                    "total_count": 100,
-                    "good_count": 99,
-                    "running_seconds": 3000,
-                    "planned_seconds": 3600,
-                },
-                {
-                    "line_id": "L3",
-                    "total_count": 100,
-                    "good_count": 99,
-                    "running_seconds": 3000,
-                    "planned_seconds": 3600,
-                },
-            ],
+            "FROM last_cache": machines,
+            "FROM machine_state": _state_agg(("L1", "L2", "L3")),
+            "FROM part_events": _parts_agg(("L1", "L2", "L3")),
             "FROM alerts": [],
         }
     )
@@ -99,8 +88,9 @@ def test_machine_state_serialized_per_machine():
     machines = [_machine("L2", "S4", "stopped"), _machine("L1", "S1", "running")]
     fake = CannedInflux(
         {
-            "FROM machine_state": machines,
-            "FROM part_events": [],
+            "FROM last_cache": machines,
+            "FROM machine_state": _state_agg(("L1", "L2")),
+            "FROM part_events": _parts_agg(("L1", "L2")),
             "FROM alerts": [],
         }
     )
@@ -115,8 +105,9 @@ def test_alerts_array_present_even_when_empty():
     mod = _load_plugin()
     fake = CannedInflux(
         {
-            "FROM machine_state": [_machine("L1", "S1", "running")],
-            "FROM part_events": [],
+            "FROM last_cache": [_machine("L1", "S1", "running")],
+            "FROM machine_state": _state_agg(("L1",)),
+            "FROM part_events": _parts_agg(("L1",)),
             "FROM alerts": [],
         }
     )
@@ -130,11 +121,12 @@ def test_alerts_filtered_per_line():
     mod = _load_plugin()
     fake = CannedInflux(
         {
-            "FROM machine_state": [
+            "FROM last_cache": [
                 _machine("L1", "S1", "running"),
                 _machine("L2", "S4", "stopped"),
             ],
-            "FROM part_events": [],
+            "FROM machine_state": _state_agg(("L1", "L2")),
+            "FROM part_events": _parts_agg(("L1", "L2")),
             "FROM alerts": [
                 {
                     "time": 1,

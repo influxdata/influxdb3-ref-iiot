@@ -28,30 +28,40 @@ ALERT_WINDOW_SQL = "INTERVAL '15 minutes'"
 
 
 def process_request(influxdb3_local, query_parameters, request_headers, request_body, args=None):
-    # Latest state per machine via the LVC: a SELECT against machine_state
-    # picks up the cache automatically when grouping by the cache-key columns.
+    # Latest state per machine via the LVC. last_cache() is a table-valued
+    # function returning one row per cache-key combination (24 rows total).
     state_rows = influxdb3_local.query(
         "SELECT site, line_id, station_id, machine_id, state, reason "
-        "FROM machine_state ORDER BY line_id, station_id"
+        "FROM last_cache('machine_state', 'machine_state_last') "
+        "ORDER BY line_id, station_id"
     )
 
-    # Per-line A x P x Q over the current shift window (approximation: last 8h).
-    parts_rows = influxdb3_local.query(
+    # Per-line state aggregates over the current shift window. We split the
+    # OEE inputs across two queries (machine_state for time-in-state,
+    # part_events for counts) instead of using correlated COUNT(*) scalar
+    # subqueries — DataFusion's optimizer can't disambiguate multiple
+    # unaliased count(*) projections in the same SELECT.
+    state_agg_rows = influxdb3_local.query(
         f"""
         SELECT
-          ms.line_id AS line_id,
-          (SELECT COUNT(*) FROM machine_state WHERE state = 'running'
-             AND line_id = ms.line_id AND time > now() - {SHIFT_WINDOW_SQL}) AS running_seconds,
-          (SELECT COUNT(*) FROM machine_state WHERE state NOT IN ('changeover','planned_maintenance')
-             AND line_id = ms.line_id AND time > now() - {SHIFT_WINDOW_SQL}) AS planned_seconds,
-          (SELECT COUNT(*) FROM part_events
-             WHERE line_id = ms.line_id AND time > now() - {SHIFT_WINDOW_SQL}) AS total_count,
-          (SELECT COUNT(*) FROM part_events
-             WHERE line_id = ms.line_id AND quality = 'good'
-             AND time > now() - {SHIFT_WINDOW_SQL}) AS good_count
-        FROM machine_state ms
-        WHERE ms.time > now() - {SHIFT_WINDOW_SQL}
-        GROUP BY ms.line_id
+          line_id,
+          SUM(CASE WHEN state = 'running' THEN 1 ELSE 0 END) AS running_seconds,
+          SUM(CASE WHEN state NOT IN ('changeover','planned_maintenance') THEN 1 ELSE 0 END) AS planned_seconds
+        FROM machine_state
+        WHERE time > now() - {SHIFT_WINDOW_SQL}
+        GROUP BY line_id
+        """
+    )
+
+    parts_agg_rows = influxdb3_local.query(
+        f"""
+        SELECT
+          line_id,
+          COUNT(*) AS total_count,
+          SUM(CASE WHEN quality = 'good' THEN 1 ELSE 0 END) AS good_count
+        FROM part_events
+        WHERE time > now() - {SHIFT_WINDOW_SQL}
+        GROUP BY line_id
         """
     )
 
@@ -92,20 +102,19 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
     # Per-line OEE (use ideal cycle 30s; real value should come from per-machine
     # config but for this reference we use the fleet default)
     ideal_cycle_s = 30.0
-    parts_by_line = {str(r["line_id"]): r for r in parts_rows}
+    state_by_line = {str(r["line_id"]): r for r in state_agg_rows}
+    parts_by_line = {str(r["line_id"]): r for r in parts_agg_rows}
 
     lines_out = []
     for line_id in sorted(by_line):
         machines = by_line[line_id]
         machines.sort(key=lambda m: m["station_id"])
-        pl = parts_by_line.get(line_id)
-        if pl:
-            running_s = float(pl.get("running_seconds") or 0)
-            planned_s = float(pl.get("planned_seconds") or 0)
-            total = float(pl.get("total_count") or 0)
-            good = float(pl.get("good_count") or 0)
-        else:
-            running_s = planned_s = total = good = 0.0
+        sl = state_by_line.get(line_id) or {}
+        pl = parts_by_line.get(line_id) or {}
+        running_s = float(sl.get("running_seconds") or 0)
+        planned_s = float(sl.get("planned_seconds") or 0)
+        total = float(pl.get("total_count") or 0)
+        good = float(pl.get("good_count") or 0)
         availability = (running_s / planned_s) if planned_s > 0 else 0.0
         performance = min(1.0, (ideal_cycle_s * total) / running_s) if running_s > 0 else 0.0
         quality = (good / total) if total > 0 else 0.0
