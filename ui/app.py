@@ -30,6 +30,10 @@ ROOT = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "templates"))
 
 INFLUX_URL = os.environ.get("INFLUX_URL", "http://influxdb3:8181")
+# Browser-facing URL for direct fetches (the andon board panel calls the Processing
+# Engine endpoint from the browser). Defaults to localhost so the dev `make up` flow
+# works with the bundled docker-compose port mapping (8181).
+INFLUX_PUBLIC_URL = os.environ.get("INFLUX_PUBLIC_URL", "http://localhost:8181")
 INFLUX_DB = os.environ.get("INFLUX_DB", "iiot")
 TOKEN_FILE = os.environ.get("INFLUX_TOKEN_FILE", "/tokens/.iiot-operator-token")
 
@@ -79,7 +83,7 @@ def overview(request: Request) -> HTMLResponse:
         {
             "request": request,
             "poll": _poll_intervals(),
-            "andon_url": f"{INFLUX_URL}/api/v3/engine/andon_board",
+            "andon_url": f"{INFLUX_PUBLIC_URL}/api/v3/engine/andon_board",
             "andon_token": _load_token(),
         },
     )
