@@ -153,5 +153,5 @@ def andon_board(request: Request) -> HTMLResponse:
 
 @app.get("/partials/alerts", response_class=HTMLResponse)
 def alerts(request: Request) -> HTMLResponse:
-    rows = _query(queries.recent_alerts_sql(50))
+    rows = _query(queries.recent_alerts_sql(10))
     return TEMPLATES.TemplateResponse(request, "partials/_alerts.html", {"alerts": rows})
