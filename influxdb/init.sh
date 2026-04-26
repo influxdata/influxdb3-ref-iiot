@@ -98,9 +98,44 @@ ensure_caches() {
 }
 
 ensure_triggers() {
-    # Filled in in Task 17 after plugin files exist. Stubbed here so the
-    # function is callable; main() invokes it.
-    log "no triggers yet (added in Task 17)"
+    log "registering processing-engine triggers"
+
+    # WAL trigger on machine_state — transition-detect downtime alerts
+    idempotent "trigger downtime_detector" create trigger \
+        --database "${INFLUX_DB}" \
+        --trigger-spec "table:machine_state" \
+        --path "wal_downtime_detector.py" \
+        downtime_detector
+
+    # WAL trigger on part_events — windowed scrap-rate quality alerts
+    idempotent "trigger quality_excursion" create trigger \
+        --database "${INFLUX_DB}" \
+        --trigger-spec "table:part_events" \
+        --path "wal_quality_excursion.py" \
+        --trigger-arguments "window=20,scrap_threshold=0.10" \
+        quality_excursion
+
+    # Schedule trigger: shift boundaries 06:00, 14:00, 22:00 UTC.
+    # 6-field cron: <sec> <min> <hour> <dom> <mon> <dow>
+    idempotent "trigger shift_summary" create trigger \
+        --database "${INFLUX_DB}" \
+        --trigger-spec "cron:0 0 6,14,22 * * *" \
+        --path "schedule_shift_summary.py" \
+        --trigger-arguments "ideal_cycle_s=30.0" \
+        shift_summary
+
+    # Request trigger: HTTP path /api/v3/engine/andon_board
+    idempotent "trigger andon_board" create trigger \
+        --database "${INFLUX_DB}" \
+        --trigger-spec "request:andon_board" \
+        --path "request_andon_board.py" \
+        andon_board
+
+    # Enable all triggers (idempotent — enabling an already-enabled trigger is a no-op).
+    for t in downtime_detector quality_excursion shift_summary andon_board; do
+        cli enable trigger "${t}" --database "${INFLUX_DB}" 2>/dev/null || \
+            log "trigger ${t} enable no-op"
+    done
 }
 
 main() {
