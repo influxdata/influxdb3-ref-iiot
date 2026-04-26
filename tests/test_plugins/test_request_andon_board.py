@@ -99,8 +99,8 @@ def test_returns_three_lines_eight_stations_each():
             machines.append(_machine(li, si, "running"))
     fake = CannedInflux(_routes(("L1", "L2", "L3"), machines))
     resp = mod.process_request(fake, query_parameters={}, request_headers={}, request_body=b"")
-    assert resp["status"] == 200
-    body = resp["body"]
+    assert "lines" in resp
+    body = resp
     assert len(body["lines"]) == 3
     for line in body["lines"]:
         assert len(line["machines"]) == 8
@@ -117,7 +117,7 @@ def test_machine_state_serialized_per_machine():
     machines = [_machine("L2", "S4", "stopped"), _machine("L1", "S1", "running")]
     fake = CannedInflux(_routes(("L1", "L2"), machines))
     resp = mod.process_request(fake, query_parameters={}, request_headers={}, request_body=b"")
-    body = resp["body"]
+    body = resp
     by_id = {m["machine_id"]: m for line in body["lines"] for m in line["machines"]}
     assert by_id["L2-S4"]["state"] == "stopped"
     assert by_id["L1-S1"]["state"] == "running"
@@ -127,7 +127,7 @@ def test_alerts_array_present_even_when_empty():
     mod = _load_plugin()
     fake = CannedInflux(_routes(("L1",), [_machine("L1", "S1", "running")]))
     resp = mod.process_request(fake, query_parameters={}, request_headers={}, request_body=b"")
-    body = resp["body"]
+    body = resp
     assert isinstance(body["lines"][0]["alerts"], list)
     assert body["lines"][0]["alerts"] == []  # not None
 
@@ -148,7 +148,7 @@ def test_alerts_filtered_per_line():
     ]
     fake = CannedInflux(_routes(("L1", "L2"), machines, alerts))
     resp = mod.process_request(fake, query_parameters={}, request_headers={}, request_body=b"")
-    body = resp["body"]
+    body = resp
     by_line = {l["line_id"]: l for l in body["lines"]}
     assert len(by_line["L2"]["alerts"]) == 1
     assert by_line["L2"]["alerts"][0]["reason"] == "tool_change"
@@ -160,7 +160,7 @@ def test_history_includes_per_minute_buckets():
     machines = [_machine("L1", "S1", "running")]
     fake = CannedInflux(_routes(("L1",), machines))
     resp = mod.process_request(fake, query_parameters={}, request_headers={}, request_body=b"")
-    line = resp["body"]["lines"][0]
+    line = resp["lines"][0]
     assert len(line["history"]) == 2  # two synthetic buckets in fake
     for h in line["history"]:
         assert "bucket" in h

@@ -201,10 +201,10 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
             }
         )
 
+    # Return the body directly. Some Processing Engine versions auto-unwrap
+    # a {"status", "body"} shape; this version returns the dict as-is to the
+    # client. Returning the body dict directly works in either case.
     return {
-        "status": 200,
-        "body": {
-            "lines": lines_out,
-            "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        },
+        "lines": lines_out,
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }

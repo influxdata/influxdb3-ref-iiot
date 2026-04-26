@@ -132,10 +132,13 @@
       var t0 = performance.now();
       fetch(url, {headers: {'Authorization': 'Bearer ' + token}})
         .then(function (r) { return r.json(); })
-        .then(function (data) {
+        .then(function (raw) {
           var ms = Math.round(performance.now() - t0);
           var label = document.getElementById('andon-latency');
           if (label) label.textContent = ms;
+          // Some Processing Engine versions auto-unwrap a {status, body}
+          // wrapper before sending; others pass it through. Handle either.
+          var data = (raw && raw.body && raw.body.lines) ? raw.body : raw;
           renderAndon(data);
           if (data && Array.isArray(data.lines)) {
             updateChartsFromHistory(charts, data.lines);
