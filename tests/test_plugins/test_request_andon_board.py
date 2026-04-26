@@ -53,15 +53,35 @@ def test_returns_three_lines_eight_stations_each():
     for li in ("L1", "L2", "L3"):
         for si in (f"S{i}" for i in range(1, 9)):
             machines.append(_machine(li, si, "running"))
-    fake = CannedInflux({
-        "FROM machine_state": machines,
-        "FROM part_events": [
-            {"line_id": "L1", "total_count": 100, "good_count": 99, "running_seconds": 3000, "planned_seconds": 3600},
-            {"line_id": "L2", "total_count": 100, "good_count": 99, "running_seconds": 3000, "planned_seconds": 3600},
-            {"line_id": "L3", "total_count": 100, "good_count": 99, "running_seconds": 3000, "planned_seconds": 3600},
-        ],
-        "FROM alerts": [],
-    })
+    fake = CannedInflux(
+        {
+            "FROM machine_state": machines,
+            "FROM part_events": [
+                {
+                    "line_id": "L1",
+                    "total_count": 100,
+                    "good_count": 99,
+                    "running_seconds": 3000,
+                    "planned_seconds": 3600,
+                },
+                {
+                    "line_id": "L2",
+                    "total_count": 100,
+                    "good_count": 99,
+                    "running_seconds": 3000,
+                    "planned_seconds": 3600,
+                },
+                {
+                    "line_id": "L3",
+                    "total_count": 100,
+                    "good_count": 99,
+                    "running_seconds": 3000,
+                    "planned_seconds": 3600,
+                },
+            ],
+            "FROM alerts": [],
+        }
+    )
     resp = mod.process_request(fake, query_parameters={}, request_headers={}, request_body=b"")
     assert resp["status"] == 200
     body = resp["body"]
@@ -77,11 +97,13 @@ def test_returns_three_lines_eight_stations_each():
 def test_machine_state_serialized_per_machine():
     mod = _load_plugin()
     machines = [_machine("L2", "S4", "stopped"), _machine("L1", "S1", "running")]
-    fake = CannedInflux({
-        "FROM machine_state": machines,
-        "FROM part_events": [],
-        "FROM alerts": [],
-    })
+    fake = CannedInflux(
+        {
+            "FROM machine_state": machines,
+            "FROM part_events": [],
+            "FROM alerts": [],
+        }
+    )
     resp = mod.process_request(fake, query_parameters={}, request_headers={}, request_body=b"")
     body = resp["body"]
     by_id = {m["machine_id"]: m for line in body["lines"] for m in line["machines"]}
@@ -91,11 +113,13 @@ def test_machine_state_serialized_per_machine():
 
 def test_alerts_array_present_even_when_empty():
     mod = _load_plugin()
-    fake = CannedInflux({
-        "FROM machine_state": [_machine("L1", "S1", "running")],
-        "FROM part_events": [],
-        "FROM alerts": [],
-    })
+    fake = CannedInflux(
+        {
+            "FROM machine_state": [_machine("L1", "S1", "running")],
+            "FROM part_events": [],
+            "FROM alerts": [],
+        }
+    )
     resp = mod.process_request(fake, query_parameters={}, request_headers={}, request_body=b"")
     body = resp["body"]
     assert isinstance(body["lines"][0]["alerts"], list)
@@ -104,17 +128,26 @@ def test_alerts_array_present_even_when_empty():
 
 def test_alerts_filtered_per_line():
     mod = _load_plugin()
-    fake = CannedInflux({
-        "FROM machine_state": [
-            _machine("L1", "S1", "running"),
-            _machine("L2", "S4", "stopped"),
-        ],
-        "FROM part_events": [],
-        "FROM alerts": [
-            {"time": 1, "line_id": "L2", "machine_id": "L2-S4", "severity": "critical",
-             "reason": "tool_change", "source": "wal_downtime_detector", "value": 0.0},
-        ],
-    })
+    fake = CannedInflux(
+        {
+            "FROM machine_state": [
+                _machine("L1", "S1", "running"),
+                _machine("L2", "S4", "stopped"),
+            ],
+            "FROM part_events": [],
+            "FROM alerts": [
+                {
+                    "time": 1,
+                    "line_id": "L2",
+                    "machine_id": "L2-S4",
+                    "severity": "critical",
+                    "reason": "tool_change",
+                    "source": "wal_downtime_detector",
+                    "value": 0.0,
+                },
+            ],
+        }
+    )
     resp = mod.process_request(fake, query_parameters={}, request_headers={}, request_body=b"")
     body = resp["body"]
     by_line = {l["line_id"]: l for l in body["lines"]}

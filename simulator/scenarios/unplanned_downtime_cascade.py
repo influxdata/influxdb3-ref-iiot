@@ -19,8 +19,8 @@ SITE = "acme-main"
 def _state_line(station: str, state: str, reason: str = "") -> str:
     machine_id = f"{LINE}-{station}"
     return (
-        f'machine_state,site={SITE},line_id={LINE},'
-        f'station_id={station},machine_id={machine_id} '
+        f"machine_state,site={SITE},line_id={LINE},"
+        f"station_id={station},machine_id={machine_id} "
         f'state="{state}",reason="{reason}" {now_ns()}'
     )
 
@@ -55,7 +55,9 @@ def main() -> None:
             writer.write(_state_line(s, "running"))
         writer.flush()
 
-        announce(6, "DONE — verify: SELECT * FROM alerts WHERE line_id='L2' ORDER BY time DESC LIMIT 5")
+        announce(
+            6, "DONE — verify: SELECT * FROM alerts WHERE line_id='L2' ORDER BY time DESC LIMIT 5"
+        )
     finally:
         writer.flush()
 

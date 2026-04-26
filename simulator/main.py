@@ -18,8 +18,10 @@ def main() -> None:
     log.info("starting simulator: %s", cfg)
     writer = InfluxDB3Writer(url=cfg.influxdb_url, database=cfg.database, token=cfg.token)
     plant = build_plant(
-        site=cfg.site, lines=cfg.lines,
-        stations_per_line=cfg.stations_per_line, seed=cfg.seed,
+        site=cfg.site,
+        lines=cfg.lines,
+        stations_per_line=cfg.stations_per_line,
+        seed=cfg.seed,
         nominal_cycle_s=cfg.nominal_cycle_s,
     )
     period = 1.0 / cfg.rate_hz

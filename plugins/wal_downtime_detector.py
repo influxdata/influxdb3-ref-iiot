@@ -43,9 +43,7 @@ def process_writes(influxdb3_local, table_batches, args=None):
                 continue
             reason = str(row.get("reason", ""))
             line_id = str(row.get("line_id", ""))
-            influxdb3_local.info(
-                f"downtime: {machine_id} {prev} -> {state} (reason={reason})"
-            )
+            influxdb3_local.info(f"downtime: {machine_id} {prev} -> {state} (reason={reason})")
             lb = (
                 LineBuilder("alerts")
                 .tag("source", "wal_downtime_detector")

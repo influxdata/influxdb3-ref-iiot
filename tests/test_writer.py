@@ -16,8 +16,11 @@ class _RecordingTransport:
 def test_writer_batches_lines_until_flush():
     t = _RecordingTransport()
     w = InfluxDB3Writer(
-        url="http://x", database="iiot", token="t",
-        batch_size=3, transport=t,
+        url="http://x",
+        database="iiot",
+        token="t",
+        batch_size=3,
+        transport=t,
     )
     w.write("a,t=1 v=1 1")
     w.write("a,t=1 v=2 2")
@@ -30,8 +33,11 @@ def test_writer_batches_lines_until_flush():
 def test_writer_flush_emits_remaining():
     t = _RecordingTransport()
     w = InfluxDB3Writer(
-        url="http://x", database="iiot", token="t",
-        batch_size=10, transport=t,
+        url="http://x",
+        database="iiot",
+        token="t",
+        batch_size=10,
+        transport=t,
     )
     w.write("a,t=1 v=1 1")
     w.flush()
@@ -42,8 +48,11 @@ def test_writer_flush_emits_remaining():
 def test_writer_flush_is_noop_when_empty():
     t = _RecordingTransport()
     w = InfluxDB3Writer(
-        url="http://x", database="iiot", token="t",
-        batch_size=10, transport=t,
+        url="http://x",
+        database="iiot",
+        token="t",
+        batch_size=10,
+        transport=t,
     )
     w.flush()
     assert t.payloads == []

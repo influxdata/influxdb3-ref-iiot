@@ -13,7 +13,7 @@ Shifts:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 # LineBuilder is INJECTED — see ARCHITECTURE.md "Plugin conventions".
 
@@ -39,7 +39,7 @@ def compute_shift_window(call_time: datetime) -> tuple[str, datetime, datetime]:
 
 
 def _iso(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _per_line_running(start: datetime, end: datetime) -> str:

@@ -106,7 +106,9 @@ def test_no_repeat_alert_while_above_threshold(monkeypatch):
     mod.process_writes(fake, [_batch(bad)], args={"window": "20", "scrap_threshold": "0.10"})
     assert len(fake.writes) == 1
     # Another batch keeps scrap rate above threshold
-    mod.process_writes(fake, [_batch([_row("L1-S6", "scrap")])], args={"window": "20", "scrap_threshold": "0.10"})
+    mod.process_writes(
+        fake, [_batch([_row("L1-S6", "scrap")])], args={"window": "20", "scrap_threshold": "0.10"}
+    )
     # Still only one alert
     assert len(fake.writes) == 1
 
@@ -120,10 +122,18 @@ def test_re_alerts_after_dropping_below_then_crossing_again(monkeypatch):
     mod.process_writes(fake, [_batch(bad)], args={"window": "20", "scrap_threshold": "0.10"})
     assert len(fake.writes) == 1
     # Push 20 goods through to drop the rate to 0
-    mod.process_writes(fake, [_batch([_row("L1-S6", "good")] * 25)], args={"window": "20", "scrap_threshold": "0.10"})
+    mod.process_writes(
+        fake,
+        [_batch([_row("L1-S6", "good")] * 25)],
+        args={"window": "20", "scrap_threshold": "0.10"},
+    )
     assert len(fake.writes) == 1  # no new alert below threshold
     # Now cross again
-    mod.process_writes(fake, [_batch([_row("L1-S6", "scrap")] * 5)], args={"window": "20", "scrap_threshold": "0.10"})
+    mod.process_writes(
+        fake,
+        [_batch([_row("L1-S6", "scrap")] * 5)],
+        args={"window": "20", "scrap_threshold": "0.10"},
+    )
     assert len(fake.writes) == 2  # new alert fired
 
 
@@ -133,8 +143,9 @@ def test_per_machine_isolation(monkeypatch):
     _reset(mod)
     fake = RecordingInflux()
     # L1-S6 crosses; L2-S2 stays clean
-    rows = [_row("L1-S6", "scrap")] * 5 + [_row("L1-S6", "good")] * 15 + \
-           [_row("L2-S2", "good")] * 20
+    rows = (
+        [_row("L1-S6", "scrap")] * 5 + [_row("L1-S6", "good")] * 15 + [_row("L2-S2", "good")] * 20
+    )
     mod.process_writes(fake, [_batch(rows)], args={"window": "20", "scrap_threshold": "0.10"})
     assert len(fake.writes) == 1
     assert fake.writes[0].tags["machine_id"] == "L1-S6"

@@ -11,10 +11,10 @@ InfluxDB 3.
 
 from __future__ import annotations
 
-
 # ---------------------------------------------------------------------------
 # Plant-state banner (LVC-served)
 # ---------------------------------------------------------------------------
+
 
 def plant_state_sql() -> str:
     """Return the latest state for every machine.
@@ -36,6 +36,7 @@ def plant_state_sql() -> str:
 # ---------------------------------------------------------------------------
 # KPI row
 # ---------------------------------------------------------------------------
+
 
 def kpi_units_last_window_sql(minutes: int = 60) -> str:
     """COUNT of part_events in the last `minutes` window. Used by the KPI tile."""
@@ -99,6 +100,7 @@ def kpi_plant_oee_current_shift_sql() -> str:
 # Per-line OEE breakdown (uPlot charts)
 # ---------------------------------------------------------------------------
 
+
 def per_line_availability_sql(minutes: int = 60) -> str:
     """Per-line Availability over the last `minutes`. Used by the OEE breakdown chart."""
     return f"""
@@ -146,6 +148,7 @@ def per_line_quality_sql(minutes: int = 60) -> str:
 # ---------------------------------------------------------------------------
 # Recent alerts table
 # ---------------------------------------------------------------------------
+
 
 def recent_alerts_sql(limit: int = 50) -> str:
     """Recent alerts written by WAL plugins.

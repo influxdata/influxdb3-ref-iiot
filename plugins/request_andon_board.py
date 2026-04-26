@@ -20,7 +20,7 @@ demonstrating Processing-Engine-mediated APIs replacing a custom backend.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 # Window for "current shift" KPIs and recent alerts.
 SHIFT_WINDOW_SQL = "INTERVAL '8 hours'"
@@ -63,12 +63,14 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
     # Group machines by line_id
     by_line: dict[str, list[dict]] = {}
     for r in state_rows:
-        by_line.setdefault(str(r["line_id"]), []).append({
-            "machine_id": str(r["machine_id"]),
-            "station_id": str(r.get("station_id", "")),
-            "state": str(r["state"]),
-            "reason": str(r.get("reason", "")),
-        })
+        by_line.setdefault(str(r["line_id"]), []).append(
+            {
+                "machine_id": str(r["machine_id"]),
+                "station_id": str(r.get("station_id", "")),
+                "state": str(r["state"]),
+                "reason": str(r.get("reason", "")),
+            }
+        )
 
     # Group alerts by line_id (a row with no line_id is dropped from per-line view)
     alerts_by_line: dict[str, list[dict]] = {}
@@ -76,14 +78,16 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
         line_id = str(r.get("line_id", ""))
         if not line_id:
             continue
-        alerts_by_line.setdefault(line_id, []).append({
-            "time": r.get("time"),
-            "machine_id": str(r.get("machine_id", "")),
-            "severity": str(r.get("severity", "")),
-            "reason": str(r.get("reason", "")),
-            "source": str(r.get("source", "")),
-            "value": float(r.get("value", 0.0)),
-        })
+        alerts_by_line.setdefault(line_id, []).append(
+            {
+                "time": r.get("time"),
+                "machine_id": str(r.get("machine_id", "")),
+                "severity": str(r.get("severity", "")),
+                "reason": str(r.get("reason", "")),
+                "source": str(r.get("source", "")),
+                "value": float(r.get("value", 0.0)),
+            }
+        )
 
     # Per-line OEE (use ideal cycle 30s; real value should come from per-machine
     # config but for this reference we use the fleet default)
@@ -106,20 +110,22 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
         performance = min(1.0, (ideal_cycle_s * total) / running_s) if running_s > 0 else 0.0
         quality = (good / total) if total > 0 else 0.0
         oee = availability * performance * quality
-        lines_out.append({
-            "line_id": line_id,
-            "oee": round(oee, 4),
-            "availability": round(availability, 4),
-            "performance": round(performance, 4),
-            "quality": round(quality, 4),
-            "machines": machines,
-            "alerts": alerts_by_line.get(line_id, []),
-        })
+        lines_out.append(
+            {
+                "line_id": line_id,
+                "oee": round(oee, 4),
+                "availability": round(availability, 4),
+                "performance": round(performance, 4),
+                "quality": round(quality, 4),
+                "machines": machines,
+                "alerts": alerts_by_line.get(line_id, []),
+            }
+        )
 
     return {
         "status": 200,
         "body": {
             "lines": lines_out,
-            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         },
     }

@@ -44,3 +44,14 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# Plugins run inside the InfluxDB 3 Processing Engine, which injects
+# `LineBuilder` (and `influxdb3_local`) into module globals at runtime.
+# We do NOT import them, so silence F821 here. We also keep multi-line SQL
+# strings readable rather than wrapping them just to satisfy E501.
+"plugins/*.py" = ["F821", "E501"]
+# Inline SQL in helper modules and tests is more readable on one line.
+"ui/queries.py" = ["E501"]
+"tests/**/*.py" = ["E501", "E741"]
+"simulator/scenarios/*.py" = ["E501"]

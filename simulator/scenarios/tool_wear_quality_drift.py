@@ -25,9 +25,9 @@ END_VIB = 4.5
 def _vib_line(rms: float) -> str:
     machine_id = f"{LINE}-{TARGET_STATION}"
     return (
-        f'vibration,site={SITE},line_id={LINE},'
-        f'station_id={TARGET_STATION},machine_id={machine_id} '
-        f'rms_mm_s={rms:.3f} {now_ns()}'
+        f"vibration,site={SITE},line_id={LINE},"
+        f"station_id={TARGET_STATION},machine_id={machine_id} "
+        f"rms_mm_s={rms:.3f} {now_ns()}"
     )
 
 
@@ -35,10 +35,10 @@ def _part_line(seq: int, quality: str, cycle_time: float) -> str:
     machine_id = f"{LINE}-{TARGET_STATION}"
     part_id = f"scen-{machine_id}-{seq:08d}"
     return (
-        f'part_events,site={SITE},line_id={LINE},'
-        f'station_id={TARGET_STATION},machine_id={machine_id},'
-        f'part_id={part_id},quality={quality} '
-        f'cycle_time_s={cycle_time:.3f} {now_ns()}'
+        f"part_events,site={SITE},line_id={LINE},"
+        f"station_id={TARGET_STATION},machine_id={machine_id},"
+        f"part_id={part_id},quality={quality} "
+        f"cycle_time_s={cycle_time:.3f} {now_ns()}"
     )
 
 
@@ -65,21 +65,24 @@ def main() -> None:
             cycle_time = 30.0 + extra
 
             # Scrap rate goes from 1% to 15% as vibration crosses 3.5
-            if vib >= 3.5:
-                scrap_rate = 0.15
-            else:
-                scrap_rate = 0.01
+            scrap_rate = 0.15 if vib >= 3.5 else 0.01
             quality = "scrap" if rng.random() < scrap_rate else "good"
 
             seq += 1
             writer.write(_part_line(seq, quality, cycle_time))
             if i % 5 == 0:
                 writer.flush()
-                announce(3, f"  t={i}s  vib={vib:.2f} mm/s  cycle={cycle_time:.2f}s  scrap_rate={scrap_rate:.2f}")
+                announce(
+                    3,
+                    f"  t={i}s  vib={vib:.2f} mm/s  cycle={cycle_time:.2f}s  scrap_rate={scrap_rate:.2f}",
+                )
             sleep(1)
         writer.flush()
 
-        announce(4, "DONE — verify: SELECT * FROM alerts WHERE line_id='L1' AND severity='quality' ORDER BY time DESC LIMIT 5")
+        announce(
+            4,
+            "DONE — verify: SELECT * FROM alerts WHERE line_id='L1' AND severity='quality' ORDER BY time DESC LIMIT 5",
+        )
     finally:
         writer.flush()
 

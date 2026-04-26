@@ -61,27 +61,29 @@ def stack_up():
 
 def _query(sql: str) -> list[dict]:
     token_path = REPO_ROOT / ".smoke-token"  # written by setup, optional
-    if token_path.exists():
-        token = token_path.read_text().strip()
-    else:
-        token = ""
+    token = token_path.read_text().strip() if token_path.exists() else ""
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     r = httpx.post(
         f"{INFLUX_URL}/api/v3/query_sql",
         json={"db": "iiot", "q": sql, "format": "json"},
-        headers=headers, timeout=10.0,
+        headers=headers,
+        timeout=10.0,
     )
     r.raise_for_status()
     return r.json() or []
 
 
 def test_simulator_writing_machine_state(stack_up):
-    rows = _query("SELECT COUNT(*) AS n FROM machine_state WHERE time > now() - INTERVAL '1 minute'")
+    rows = _query(
+        "SELECT COUNT(*) AS n FROM machine_state WHERE time > now() - INTERVAL '1 minute'"
+    )
     assert int(rows[0]["n"]) > 0
 
 
 def test_lvc_returns_24_machines(stack_up):
-    rows = _query("SELECT machine_id FROM machine_state WHERE site = 'acme-main' ORDER BY machine_id")
+    rows = _query(
+        "SELECT machine_id FROM machine_state WHERE site = 'acme-main' ORDER BY machine_id"
+    )
     assert len(rows) == 24
 
 

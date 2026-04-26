@@ -19,7 +19,10 @@ from simulator.writer import InfluxDB3Writer
 def open_writer() -> InfluxDB3Writer:
     cfg = load()
     return InfluxDB3Writer(
-        url=cfg.influxdb_url, database=cfg.database, token=cfg.token, batch_size=200,
+        url=cfg.influxdb_url,
+        database=cfg.database,
+        token=cfg.token,
+        batch_size=200,
     )
 
 

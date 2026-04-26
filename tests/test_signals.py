@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
 from simulator.signals import (
     MachineState,
     PartCount,
-    Plant,
     TemperatureSensor,
     VibrationSensor,
     build_plant,
@@ -37,7 +34,12 @@ def test_machine_state_emits_one_line_per_tick():
     assert measurement == "machine_state"
     assert tags["machine_id"] == "L1-S1"
     assert fields["state"] in (
-        '"running"', '"idle"', '"stopped"', '"error"', '"changeover"', '"planned_maintenance"'
+        '"running"',
+        '"idle"',
+        '"stopped"',
+        '"error"',
+        '"changeover"',
+        '"planned_maintenance"',
     )
     assert ts == 1_000_000_000
 
@@ -60,8 +62,12 @@ def test_machine_state_can_be_overridden():
 
 def test_temperature_sensor_emits_value_near_nominal():
     t = TemperatureSensor(
-        site="acme-main", line_id="L1", station_id="S1", machine_id="L1-S1",
-        nominal_c=65.0, seed=1,
+        site="acme-main",
+        line_id="L1",
+        station_id="S1",
+        machine_id="L1-S1",
+        nominal_c=65.0,
+        seed=1,
     )
     samples = [float(_parse_line(t.tick(i, i * 1_000_000_000)[0])[2]["temp_c"]) for i in range(200)]
     avg = sum(samples) / len(samples)
@@ -70,8 +76,12 @@ def test_temperature_sensor_emits_value_near_nominal():
 
 def test_vibration_sensor_emits_10_lines_per_tick():
     v = VibrationSensor(
-        site="acme-main", line_id="L1", station_id="S1", machine_id="L1-S1",
-        nominal_mm_s=2.0, seed=1,
+        site="acme-main",
+        line_id="L1",
+        station_id="S1",
+        machine_id="L1-S1",
+        nominal_mm_s=2.0,
+        seed=1,
     )
     lines = v.tick(t_seconds=0.0, t_ns=1_000_000_000)
     assert len(lines) == 10  # 10 Hz
@@ -83,8 +93,12 @@ def test_vibration_sensor_emits_10_lines_per_tick():
 
 def test_vibration_sensor_responds_to_override():
     v = VibrationSensor(
-        site="acme-main", line_id="L1", station_id="S1", machine_id="L1-S1",
-        nominal_mm_s=2.0, seed=1,
+        site="acme-main",
+        line_id="L1",
+        station_id="S1",
+        machine_id="L1-S1",
+        nominal_mm_s=2.0,
+        seed=1,
     )
     v.set_target(4.5)  # tool wear scenario
     lines = v.tick(t_seconds=0.0, t_ns=1_000_000_000)
@@ -95,8 +109,12 @@ def test_vibration_sensor_responds_to_override():
 
 def test_part_count_emits_when_cycle_completes():
     pc = PartCount(
-        site="acme-main", line_id="L1", station_id="S1", machine_id="L1-S1",
-        ideal_cycle_time_s=2.0, seed=42,
+        site="acme-main",
+        line_id="L1",
+        station_id="S1",
+        machine_id="L1-S1",
+        ideal_cycle_time_s=2.0,
+        seed=42,
     )
     # Tick once at t=0: starts a part, no line emitted
     assert pc.tick(t_seconds=0.0, t_ns=0) == []
@@ -112,8 +130,12 @@ def test_part_count_emits_when_cycle_completes():
 
 def test_part_count_emits_no_parts_when_machine_stopped():
     pc = PartCount(
-        site="acme-main", line_id="L1", station_id="S1", machine_id="L1-S1",
-        ideal_cycle_time_s=2.0, seed=42,
+        site="acme-main",
+        line_id="L1",
+        station_id="S1",
+        machine_id="L1-S1",
+        ideal_cycle_time_s=2.0,
+        seed=42,
     )
     pc.set_running(False)
     assert pc.tick(t_seconds=0.0, t_ns=0) == []
@@ -122,8 +144,12 @@ def test_part_count_emits_no_parts_when_machine_stopped():
 
 def test_part_count_scrap_rate_default_is_low():
     pc = PartCount(
-        site="acme-main", line_id="L1", station_id="S1", machine_id="L1-S1",
-        ideal_cycle_time_s=1.0, seed=42,
+        site="acme-main",
+        line_id="L1",
+        station_id="S1",
+        machine_id="L1-S1",
+        ideal_cycle_time_s=1.0,
+        seed=42,
     )
     qualities = []
     for i in range(2000):

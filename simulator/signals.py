@@ -47,12 +47,14 @@ class MachineState:
         return self._state
 
     def tick(self, t_seconds: float, t_ns: int) -> list[str]:
-        tags = _tag_block({
-            "site": self.site,
-            "line_id": self.line_id,
-            "station_id": self.station_id,
-            "machine_id": self.machine_id,
-        })
+        tags = _tag_block(
+            {
+                "site": self.site,
+                "line_id": self.line_id,
+                "station_id": self.station_id,
+                "machine_id": self.machine_id,
+            }
+        )
         fields = f'state="{self._state}",reason="{self._reason}"'
         return [f"machine_state,{tags} {fields} {t_ns}"]
 
@@ -69,16 +71,23 @@ class TemperatureSensor:
 
     def __post_init__(self) -> None:
         self._walk = random_walk(
-            seed=self.seed, step_std=0.2, start=self.nominal_c,
-            min_val=self.nominal_c - 10.0, max_val=self.nominal_c + 20.0,
+            seed=self.seed,
+            step_std=0.2,
+            start=self.nominal_c,
+            min_val=self.nominal_c - 10.0,
+            max_val=self.nominal_c + 20.0,
         )
 
     def tick(self, t_seconds: float, t_ns: int) -> list[str]:
         v = self._walk()
-        tags = _tag_block({
-            "site": self.site, "line_id": self.line_id,
-            "station_id": self.station_id, "machine_id": self.machine_id,
-        })
+        tags = _tag_block(
+            {
+                "site": self.site,
+                "line_id": self.line_id,
+                "station_id": self.station_id,
+                "machine_id": self.machine_id,
+            }
+        )
         return [f"temperature,{tags} temp_c={v:.3f} {t_ns}"]
 
 
@@ -109,10 +118,14 @@ class VibrationSensor:
         for i in range(10):
             ts = t_ns + int(i * 100_000_000)
             v = max(0.0, self._target + self._noise(t_seconds + i * 0.1))
-            tags = _tag_block({
-                "site": self.site, "line_id": self.line_id,
-                "station_id": self.station_id, "machine_id": self.machine_id,
-            })
+            tags = _tag_block(
+                {
+                    "site": self.site,
+                    "line_id": self.line_id,
+                    "station_id": self.station_id,
+                    "machine_id": self.machine_id,
+                }
+            )
             out.append(f"vibration,{tags} rms_mm_s={v:.3f} {ts}")
         return out
 
@@ -160,11 +173,16 @@ class PartCount:
         self._seq += 1
         part_id = f"{self.machine_id}-{self._seq:08d}"
         quality = "scrap" if self._rng.random() < self._scrap_rate else "good"
-        tags = _tag_block({
-            "site": self.site, "line_id": self.line_id,
-            "station_id": self.station_id, "machine_id": self.machine_id,
-            "part_id": part_id, "quality": quality,
-        })
+        tags = _tag_block(
+            {
+                "site": self.site,
+                "line_id": self.line_id,
+                "station_id": self.station_id,
+                "machine_id": self.machine_id,
+                "part_id": part_id,
+                "quality": quality,
+            }
+        )
         cycle_time = elapsed
         line = f"part_events,{tags} cycle_time_s={cycle_time:.3f} {t_ns}"
         self._cycle_start_t = t_seconds  # next cycle starts now
@@ -215,7 +233,10 @@ class Plant:
 
 
 def build_plant(
-    site: str, lines: int, stations_per_line: int, seed: int,
+    site: str,
+    lines: int,
+    stations_per_line: int,
+    seed: int,
     nominal_cycle_s: float = 30.0,
 ) -> Plant:
     machines: list[Machine] = []
@@ -225,20 +246,37 @@ def build_plant(
             station_id = f"S{si}"
             mid = f"{line_id}-{station_id}"
             machine_seed = seed + li * 1000 + si
-            machines.append(Machine(
-                site=site, line_id=line_id, station_id=station_id, machine_id=mid,
-                state=MachineState(site, line_id, station_id, mid),
-                temperature=TemperatureSensor(
-                    site, line_id, station_id, mid,
-                    nominal_c=65.0, seed=machine_seed + 1,
-                ),
-                vibration=VibrationSensor(
-                    site, line_id, station_id, mid,
-                    nominal_mm_s=2.0, seed=machine_seed + 2,
-                ),
-                parts=PartCount(
-                    site, line_id, station_id, mid,
-                    ideal_cycle_time_s=nominal_cycle_s, seed=machine_seed + 3,
-                ),
-            ))
+            machines.append(
+                Machine(
+                    site=site,
+                    line_id=line_id,
+                    station_id=station_id,
+                    machine_id=mid,
+                    state=MachineState(site, line_id, station_id, mid),
+                    temperature=TemperatureSensor(
+                        site,
+                        line_id,
+                        station_id,
+                        mid,
+                        nominal_c=65.0,
+                        seed=machine_seed + 1,
+                    ),
+                    vibration=VibrationSensor(
+                        site,
+                        line_id,
+                        station_id,
+                        mid,
+                        nominal_mm_s=2.0,
+                        seed=machine_seed + 2,
+                    ),
+                    parts=PartCount(
+                        site,
+                        line_id,
+                        station_id,
+                        mid,
+                        ideal_cycle_time_s=nominal_cycle_s,
+                        seed=machine_seed + 3,
+                    ),
+                )
+            )
     return Plant(site=site, machines=machines)

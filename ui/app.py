@@ -92,8 +92,14 @@ def overview(request: Request) -> HTMLResponse:
 @app.get("/partials/plant_state", response_class=HTMLResponse)
 def plant_state(request: Request) -> HTMLResponse:
     rows = _query(queries.plant_state_sql())
-    state_counts = {"running": 0, "stopped": 0, "error": 0, "idle": 0,
-                    "changeover": 0, "planned_maintenance": 0}
+    state_counts = {
+        "running": 0,
+        "stopped": 0,
+        "error": 0,
+        "idle": 0,
+        "changeover": 0,
+        "planned_maintenance": 0,
+    }
     for r in rows:
         s = r.get("state")
         if s in state_counts:
@@ -141,9 +147,7 @@ def kpi_row(request: Request) -> HTMLResponse:
 @app.get("/partials/andon_board", response_class=HTMLResponse)
 def andon_board(request: Request) -> HTMLResponse:
     """Server-rendered shell with the JS hook; the data fetch happens in app.js."""
-    return TEMPLATES.TemplateResponse(
-        "partials/_andon_board.html", {"request": request}
-    )
+    return TEMPLATES.TemplateResponse("partials/_andon_board.html", {"request": request})
 
 
 @app.get("/partials/oee_breakdown", response_class=JSONResponse)
@@ -157,6 +161,4 @@ def oee_breakdown() -> JSONResponse:
 @app.get("/partials/alerts", response_class=HTMLResponse)
 def alerts(request: Request) -> HTMLResponse:
     rows = _query(queries.recent_alerts_sql(50))
-    return TEMPLATES.TemplateResponse(
-        "partials/_alerts.html", {"request": request, "alerts": rows}
-    )
+    return TEMPLATES.TemplateResponse("partials/_alerts.html", {"request": request, "alerts": rows})
