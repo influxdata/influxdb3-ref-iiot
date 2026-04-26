@@ -79,9 +79,9 @@ def _poll_intervals() -> dict[str, int]:
 @app.get("/", response_class=HTMLResponse)
 def overview(request: Request) -> HTMLResponse:
     return TEMPLATES.TemplateResponse(
+        request,
         "overview.html",
         {
-            "request": request,
             "poll": _poll_intervals(),
             "andon_url": f"{INFLUX_PUBLIC_URL}/api/v3/engine/andon_board",
             "andon_token": _load_token(),
@@ -111,8 +111,9 @@ def plant_state(request: Request) -> HTMLResponse:
     else:
         plant_state = "RUNNING"
     return TEMPLATES.TemplateResponse(
+        request,
         "partials/_plant_state.html",
-        {"request": request, "plant_state": plant_state, "counts": state_counts},
+        {"plant_state": plant_state, "counts": state_counts},
     )
 
 
@@ -133,9 +134,9 @@ def kpi_row(request: Request) -> HTMLResponse:
     else:
         plant_oee = 0.0
     return TEMPLATES.TemplateResponse(
+        request,
         "partials/_kpi_row.html",
         {
-            "request": request,
             "plant_oee_pct": round(plant_oee * 100, 1),
             "units_last_hour": units_n,
             "active_alerts": alerts_n,
@@ -147,7 +148,7 @@ def kpi_row(request: Request) -> HTMLResponse:
 @app.get("/partials/andon_board", response_class=HTMLResponse)
 def andon_board(request: Request) -> HTMLResponse:
     """Server-rendered shell with the JS hook; the data fetch happens in app.js."""
-    return TEMPLATES.TemplateResponse("partials/_andon_board.html", {"request": request})
+    return TEMPLATES.TemplateResponse(request, "partials/_andon_board.html", {})
 
 
 @app.get("/partials/oee_breakdown", response_class=JSONResponse)
@@ -161,4 +162,4 @@ def oee_breakdown() -> JSONResponse:
 @app.get("/partials/alerts", response_class=HTMLResponse)
 def alerts(request: Request) -> HTMLResponse:
     rows = _query(queries.recent_alerts_sql(50))
-    return TEMPLATES.TemplateResponse("partials/_alerts.html", {"request": request, "alerts": rows})
+    return TEMPLATES.TemplateResponse(request, "partials/_alerts.html", {"alerts": rows})

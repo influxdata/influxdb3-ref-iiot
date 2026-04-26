@@ -378,8 +378,8 @@ spin_until "simulator writing line protocol" \
     "docker logs --tail 20 iiot-simulator 2>&1 | grep -qE 'starting simulator|tick=[0-9]+'" 60 \
     || { fail "simulator not writing"; docker logs --tail 30 iiot-simulator 2>&1; exit 1; }
 spin_until "UI serving on :8080" \
-    "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ | grep -q 200" 30 \
-    || { fail "UI not responding"; exit 1; }
+    "curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/ | grep -q 200" 60 \
+    || { fail "UI not responding"; docker logs --tail 30 iiot-ui 2>&1; exit 1; }
 close_step
 
 # ── open browser ──────────────────────────────────────────────────────────
