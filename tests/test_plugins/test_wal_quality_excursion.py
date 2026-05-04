@@ -35,10 +35,25 @@ class FakeLineBuilder:
         return self
 
 
+class FakeCache:
+    def __init__(self) -> None:
+        self._store: dict[str, object] = {}
+
+    def get(self, key: str, default=None, use_global=None):
+        return self._store.get(key, default)
+
+    def put(self, key: str, value, ttl=None, use_global=None) -> None:
+        self._store[key] = value
+
+    def delete(self, key: str, use_global=None) -> bool:
+        return self._store.pop(key, None) is not None
+
+
 class RecordingInflux:
     def __init__(self) -> None:
         self.writes: list[FakeLineBuilder] = []
         self.logs: list[tuple[str, str]] = []
+        self.cache = FakeCache()
 
     def write(self, line: FakeLineBuilder) -> None:
         self.writes.append(line)
@@ -64,15 +79,9 @@ def _batch(rows: list[dict]) -> dict:
     return {"table_name": "part_events", "rows": rows}
 
 
-def _reset(mod):
-    mod._windows.clear()
-    mod._above.clear()
-
-
 def test_no_alert_below_threshold(monkeypatch):
     mod = _load_plugin()
     monkeypatch.setattr(mod, "LineBuilder", FakeLineBuilder, raising=False)
-    _reset(mod)
     fake = RecordingInflux()
     rows = [_row("L1-S1", "good")] * 19 + [_row("L1-S1", "scrap")] * 1
     mod.process_writes(fake, [_batch(rows)], args={"window": "20", "scrap_threshold": "0.10"})
@@ -82,7 +91,6 @@ def test_no_alert_below_threshold(monkeypatch):
 def test_alert_when_threshold_crossed(monkeypatch):
     mod = _load_plugin()
     monkeypatch.setattr(mod, "LineBuilder", FakeLineBuilder, raising=False)
-    _reset(mod)
     fake = RecordingInflux()
     rows = [_row("L1-S6", "good")] * 17 + [_row("L1-S6", "scrap")] * 3
     mod.process_writes(fake, [_batch(rows)], args={"window": "20", "scrap_threshold": "0.10"})
@@ -100,12 +108,11 @@ def test_alert_when_threshold_crossed(monkeypatch):
 def test_no_repeat_alert_while_above_threshold(monkeypatch):
     mod = _load_plugin()
     monkeypatch.setattr(mod, "LineBuilder", FakeLineBuilder, raising=False)
-    _reset(mod)
     fake = RecordingInflux()
     bad = [_row("L1-S6", "scrap")] * 5 + [_row("L1-S6", "good")] * 15
     mod.process_writes(fake, [_batch(bad)], args={"window": "20", "scrap_threshold": "0.10"})
     assert len(fake.writes) == 1
-    # Another batch keeps scrap rate above threshold
+    # Another batch keeps scrap rate above threshold — same fake preserves cache
     mod.process_writes(
         fake, [_batch([_row("L1-S6", "scrap")])], args={"window": "20", "scrap_threshold": "0.10"}
     )
@@ -116,7 +123,6 @@ def test_no_repeat_alert_while_above_threshold(monkeypatch):
 def test_re_alerts_after_dropping_below_then_crossing_again(monkeypatch):
     mod = _load_plugin()
     monkeypatch.setattr(mod, "LineBuilder", FakeLineBuilder, raising=False)
-    _reset(mod)
     fake = RecordingInflux()
     bad = [_row("L1-S6", "scrap")] * 5 + [_row("L1-S6", "good")] * 15
     mod.process_writes(fake, [_batch(bad)], args={"window": "20", "scrap_threshold": "0.10"})
@@ -140,7 +146,6 @@ def test_re_alerts_after_dropping_below_then_crossing_again(monkeypatch):
 def test_per_machine_isolation(monkeypatch):
     mod = _load_plugin()
     monkeypatch.setattr(mod, "LineBuilder", FakeLineBuilder, raising=False)
-    _reset(mod)
     fake = RecordingInflux()
     # L1-S6 crosses; L2-S2 stays clean
     rows = (
@@ -154,7 +159,27 @@ def test_per_machine_isolation(monkeypatch):
 def test_ignores_other_tables(monkeypatch):
     mod = _load_plugin()
     monkeypatch.setattr(mod, "LineBuilder", FakeLineBuilder, raising=False)
-    _reset(mod)
     fake = RecordingInflux()
     mod.process_writes(fake, [{"table_name": "vibration", "rows": []}], args={})
     assert fake.writes == []
+
+
+def test_cross_batch_accumulation(monkeypatch):
+    """State persists via cache across separate process_writes calls."""
+    mod = _load_plugin()
+    monkeypatch.setattr(mod, "LineBuilder", FakeLineBuilder, raising=False)
+    fake = RecordingInflux()
+    # First batch: 15 good parts (not enough to fill window)
+    mod.process_writes(
+        fake, [_batch([_row("L1-S6", "good")] * 15)], args={"window": "20", "scrap_threshold": "0.10"}
+    )
+    assert fake.writes == []
+    # Second batch: 2 more good + 3 scrap = window now has 20 parts, 3/20 = 0.15
+    mod.process_writes(
+        fake,
+        [_batch([_row("L1-S6", "good")] * 2 + [_row("L1-S6", "scrap")] * 3)],
+        args={"window": "20", "scrap_threshold": "0.10"},
+    )
+    assert len(fake.writes) == 1
+    assert fake.writes[0].tags["machine_id"] == "L1-S6"
+    assert fake.writes[0].fields["value"] == 0.15
