@@ -82,6 +82,7 @@ main { padding: 16px 24px; display: flex; flex-direction: column; gap: 16px; }
 .andon-line-oee { color: var(--text-dim); font-family: monospace; }
 .andon-empty { color: var(--text-dim); padding: 8px 0; font-style: italic; }
 
+.oee-chart .uplot, .oee-chart .u-title, .oee-chart .u-legend { color: var(--text-dim); }
 #oee-charts { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 8px; }
 .oee-chart { width: 100%; }
 .oee-chart-title {
