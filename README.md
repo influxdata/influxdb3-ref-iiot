@@ -11,6 +11,11 @@ recent alerts).
 
 ![architecture](diagrams/architecture.png)
 
+## Prerequisites
+
+- **Docker** (with Compose v2)
+- **macOS or Linux** — the Makefile and shell scripts (`scripts/`, `influxdb/init.sh`) are not tested or supported on Windows. The underlying architecture (InfluxDB 3, Processing Engine, line protocol) is fully platform-independent; only this reference repo's automation assumes a Unix shell.
+
 ## Quickstart
 
 ```bash
@@ -73,13 +78,13 @@ See `cache-distinct` in `CLI_EXAMPLES.md`.
 > user table explicitly via `POST /api/v3/configure/table` before creating the
 > caches — see `ARCHITECTURE.md` § "Table creation: explicit, not implicit".
 
-### ⬢ Custom UI calling Processing Engine directly
+### ⬢ Custom UI backed by a Processing Engine endpoint
 
-> **⚡ The andon-board panel calls the `request_andon_board` plugin via `fetch` directly
-> from the browser, not through the FastAPI backend.** The "served by Processing Engine: N ms"
-> badge shows the actual round-trip. Other panels query InfluxDB through FastAPI partial
-> routes. The Processing Engine pattern lets you ship pre-shaped JSON without a custom
-> backend service. See `ARCHITECTURE.md` § "UI data flow" for when to pick which.
+> **⚡ The andon-board panel is powered by `request_andon_board`**, a Python plugin that
+> runs inside InfluxDB and returns the full plant view as pre-shaped JSON. The FastAPI
+> backend proxies the call (`/api/andon`) and the "served by Processing Engine: N ms"
+> badge shows the round-trip. Other panels query InfluxDB through FastAPI partial routes.
+> See `ARCHITECTURE.md` § "UI data flow" for when to pick which pattern.
 
 ## Running the tests
 
