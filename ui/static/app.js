@@ -106,8 +106,8 @@
         {label: 'Quality',     stroke: '#fbbf24', width: 2, dash: [2, 3]},
       ],
       axes: [
-        {scale: 'x'},
-        {scale: 'y', values: function (_, t) { return t.map(function (v) { return (v * 100).toFixed(0) + '%'; }); }},
+        {scale: 'x', stroke: '#8b949e', ticks: {stroke: '#30363d'}, grid: {stroke: '#30363d'}},
+        {scale: 'y', stroke: '#8b949e', ticks: {stroke: '#30363d'}, grid: {stroke: '#30363d'}, values: function (_, t) { return t.map(function (v) { return (v * 100).toFixed(0) + '%'; }); }},
       ],
     };
     var data = [[], [], [], []];
@@ -154,7 +154,6 @@
     var panel = document.getElementById('andon-panel');
     if (!panel) return;
     var url = panel.dataset.andonUrl;
-    var token = panel.dataset.andonToken;
     var pollMs = parseInt(panel.dataset.andonPollMs, 10) || 2000;
 
     var charts = {
@@ -165,7 +164,7 @@
 
     function fetchOnce() {
       var t0 = performance.now();
-      fetch(url, {headers: {'Authorization': 'Bearer ' + token}})
+      fetch(url)
         .then(function (r) { return r.json(); })
         .then(function (raw) {
           var ms = Math.round(performance.now() - t0);

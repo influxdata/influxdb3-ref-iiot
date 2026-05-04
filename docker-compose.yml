@@ -117,7 +117,6 @@ services:
         condition: service_completed_successfully
     environment:
       INFLUX_URL: http://influxdb3:8181
-      INFLUX_PUBLIC_URL: ${INFLUX_PUBLIC_URL:-http://localhost:8181}
       INFLUX_DB: iiot
       INFLUX_TOKEN_FILE: /tokens/.iiot-operator-token
       UI_KPI_POLL_MS: ${UI_KPI_POLL_MS:-2000}

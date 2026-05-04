@@ -2,14 +2,10 @@
 
 Routes:
   GET /              -> overview shell (Jinja2)
+  GET /api/andon     -> reverse proxy to Processing Engine andon_board endpoint
   GET /partials/...  -> HTMX-loaded partials (KPI row, plant state, OEE
                         breakdown, recent alerts)
   /static/*          -> bundled assets
-
-The andon-board panel is loaded as a partial too, but its DATA fetch goes
-directly to the InfluxDB Processing-Engine endpoint via JS (see app.js)
-so that the "served by Processing Engine" timing badge measures only
-the round-trip to the database, not a backend hop.
 """
 
 from __future__ import annotations
@@ -30,10 +26,6 @@ ROOT = Path(__file__).resolve().parent
 TEMPLATES = Jinja2Templates(directory=str(ROOT / "templates"))
 
 INFLUX_URL = os.environ.get("INFLUX_URL", "http://influxdb3:8181")
-# Browser-facing URL for direct fetches (the andon board panel calls the Processing
-# Engine endpoint from the browser). Defaults to localhost so the dev `make up` flow
-# works with the bundled docker-compose port mapping (8181).
-INFLUX_PUBLIC_URL = os.environ.get("INFLUX_PUBLIC_URL", "http://localhost:8181")
 INFLUX_DB = os.environ.get("INFLUX_DB", "iiot")
 TOKEN_FILE = os.environ.get("INFLUX_TOKEN_FILE", "/tokens/.iiot-operator-token")
 
@@ -83,10 +75,22 @@ def overview(request: Request) -> HTMLResponse:
         "overview.html",
         {
             "poll": _poll_intervals(),
-            "andon_url": f"{INFLUX_PUBLIC_URL}/api/v3/engine/andon_board",
-            "andon_token": _load_token(),
+            "andon_url": "/api/andon",
         },
     )
+
+
+@app.get("/api/andon")
+def andon_proxy():
+    """Reverse-proxy to the Processing Engine andon_board endpoint.
+
+    Avoids CORS issues (browser stays on same origin) and keeps the
+    InfluxDB auth token server-side.
+    """
+    with _client() as c:
+        r = c.get("/api/v3/engine/andon_board")
+        r.raise_for_status()
+        return r.json()
 
 
 @app.get("/partials/plant_state", response_class=HTMLResponse)
