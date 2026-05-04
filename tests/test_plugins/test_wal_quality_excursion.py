@@ -171,7 +171,9 @@ def test_cross_batch_accumulation(monkeypatch):
     fake = RecordingInflux()
     # First batch: 15 good parts (not enough to fill window)
     mod.process_writes(
-        fake, [_batch([_row("L1-S6", "good")] * 15)], args={"window": "20", "scrap_threshold": "0.10"}
+        fake,
+        [_batch([_row("L1-S6", "good")] * 15)],
+        args={"window": "20", "scrap_threshold": "0.10"},
     )
     assert fake.writes == []
     # Second batch: 2 more good + 3 scrap = window now has 20 parts, 3/20 = 0.15
