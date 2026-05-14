@@ -54,9 +54,7 @@ def _machine(line_id: str, station_id: str, state: str) -> dict:
 
 
 def _state_agg(line_ids: tuple[str, ...]) -> list[dict]:
-    return [
-        {"line_id": lid, "running_seconds": 3000, "planned_seconds": 3600} for lid in line_ids
-    ]
+    return [{"line_id": lid, "running_seconds": 3000, "planned_seconds": 3600} for lid in line_ids]
 
 
 def _parts_agg(line_ids: tuple[str, ...]) -> list[dict]:

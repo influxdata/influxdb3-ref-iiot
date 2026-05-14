@@ -180,8 +180,10 @@ def process_request(influxdb3_local, query_parameters, request_headers, request_
         # are kept; _compute_oee returns None for performance/quality when
         # total_count is 0, so partial-slice buckets render as a gap in the
         # P/Q lines instead of a dip to zero.
-        buckets = sorted({b for (lid, b) in state_hist if lid == line_id} |
-                         {b for (lid, b) in parts_hist if lid == line_id})
+        buckets = sorted(
+            {b for (lid, b) in state_hist if lid == line_id}
+            | {b for (lid, b) in parts_hist if lid == line_id}
+        )
         out = []
         for b in buckets:
             sh = state_hist.get((line_id, b)) or {}
