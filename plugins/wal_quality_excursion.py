@@ -7,18 +7,13 @@ Side effects: writes one row to `alerts` each time a machine's rolling
    re-emit while the machine remains above; emits again only after dropping
    back below and re-crossing.
 
-Per-machine windows kept in a module-level dict; survives across batches,
-resets on engine restart (acceptable for reference; see ARCHITECTURE.md).
+Per-machine state is stored in the trigger-local cache
+(influxdb3_local.cache) so it persists across WAL invocations.
 """
 
 from collections import deque
 
 # LineBuilder is INJECTED — see ARCHITECTURE.md "Plugin conventions".
-
-# machine_id -> deque of last N qualities ("good"/"scrap")
-_windows: dict[str, deque[str]] = {}
-# machine_id -> bool: are we currently above the threshold?
-_above: dict[str, bool] = {}
 
 
 def _scrap_rate(window: deque[str]) -> float:
@@ -31,6 +26,21 @@ def process_writes(influxdb3_local, table_batches, args=None):
     a = args or {}
     win_size = int(a.get("window", "20"))
     threshold = float(a.get("scrap_threshold", "0.10"))
+    cache = influxdb3_local.cache
+
+    # Load from cache on first access per machine, work in memory, flush at end.
+    windows: dict[str, deque[str]] = {}
+    above: dict[str, bool] = {}
+
+    def _ensure_loaded(mid: str) -> None:
+        if mid not in windows:
+            state = cache.get(f"qe:{mid}")
+            if state is not None:
+                windows[mid] = deque(state["window"], maxlen=win_size)
+                above[mid] = state["above"]
+            else:
+                windows[mid] = deque(maxlen=win_size)
+                above[mid] = False
 
     for batch in table_batches:
         if batch["table_name"] != "part_events":
@@ -40,20 +50,15 @@ def process_writes(influxdb3_local, table_batches, args=None):
             quality = str(row.get("quality", ""))
             if not machine_id or quality not in ("good", "scrap"):
                 continue
-            if machine_id not in _windows:
-                _windows[machine_id] = deque(maxlen=win_size)
-            window = _windows[machine_id]
+            _ensure_loaded(machine_id)
+            window = windows[machine_id]
             window.append(quality)
-            # Only assess threshold once the rolling window is at full capacity.
-            # This avoids spurious early alerts on a partially-filled window
-            # (e.g. 1 scrap out of 5 = 0.20 would be a false positive against
-            # a 0.10 threshold meant for a 20-sample window).
             if len(window) < win_size:
                 continue
             rate = _scrap_rate(window)
             currently_above = rate >= threshold
-            was_above = _above.get(machine_id, False)
-            _above[machine_id] = currently_above
+            was_above = above[machine_id]
+            above[machine_id] = currently_above
             if currently_above and not was_above:
                 line_id = str(row.get("line_id", ""))
                 influxdb3_local.info(
@@ -70,3 +75,6 @@ def process_writes(influxdb3_local, table_batches, args=None):
                     .float64_field("value", float(rate))
                 )
                 influxdb3_local.write(lb)
+
+    for mid in windows:
+        cache.put(f"qe:{mid}", {"window": list(windows[mid]), "above": above[mid]})

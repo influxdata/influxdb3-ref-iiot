@@ -246,10 +246,9 @@ echo "       'docker compose up -d' and waits for each service to be ready.${RES
 echo
 echo "  ${FG_CYAN}2.${RESET} ${FG_GREEN}[script]${RESET} -> ${FG_BLUE}[ui]${RESET} ${BOLD}Open the control-room UI${RESET} in your browser."
 echo "       ${FG_TEXT}Once open, the ${BOLD}browser polls FastAPI in iiot-ui${RESET}${FG_TEXT} every 2-5s for the${RESET}"
-echo "       ${FG_TEXT}plant-state banner, KPIs, and OEE charts. The ${BOLD}andon panel is different${RESET}${FG_TEXT}:${RESET}"
-echo "       ${FG_TEXT}it fetches /api/v3/engine/andon_board ${BOLD}directly from the browser${RESET}${FG_TEXT}, with a${RESET}"
-echo "       ${FG_TEXT}\"served by Processing Engine: N ms\" badge showing the actual round-trip.${RESET}"
-echo "       ${FG_TEXT}Two patterns side-by-side: SQL through a backend vs plugin via direct fetch.${RESET}"
+echo "       ${FG_TEXT}plant-state banner, KPIs, OEE charts, and andon board. The andon panel${RESET}"
+echo "       ${FG_TEXT}is proxied through FastAPI to the Processing Engine's andon_board endpoint,${RESET}"
+echo "       ${FG_TEXT}with a \"served by Processing Engine: N ms\" badge showing round-trip latency.${RESET}"
 echo
 echo "  ${FG_CYAN}3.${RESET} ${FG_GREEN}[script]${RESET} -> ${FG_MAGENTA}[sim]${RESET} -> ${FG_YELLOW}[db]${RESET} ${BOLD}Inject the unplanned_downtime_cascade scenario${RESET}"
 echo "       ${FG_TEXT}Script runs a one-shot scenario container that flips Line 2 / Station 4${RESET}"
@@ -267,9 +266,9 @@ echo "  ${FG_CYAN}5.${RESET} ${FG_GREEN}[script]${RESET} -> ${FG_YELLOW}[db]${RE
 echo "       ${FG_TEXT}'GET /api/v3/engine/andon_board' is served by request_andon_board.py${RESET}"
 echo "       ${FG_TEXT}running inside influxdb3 — Python in the database, no app server. The${RESET}"
 echo "       ${FG_TEXT}response payload is the full plant view: every line, every machine, the${RESET}"
-echo "       ${FG_TEXT}live A×P×Q breakdown, and the active alerts. ${BOLD}This is the same call${RESET}"
-echo "       ${FG_TEXT}${BOLD}the browser's andon panel makes${RESET}${FG_TEXT} — measured here so you can${RESET}"
-echo "       ${FG_TEXT}see the latency yourself.${RESET}"
+echo "       ${FG_TEXT}live A×P×Q breakdown, and the active alerts. The browser's andon panel${RESET}"
+echo "       ${FG_TEXT}hits the same endpoint (proxied through FastAPI) — measured here so you${RESET}"
+echo "       ${FG_TEXT}can see the latency yourself.${RESET}"
 echo
 echo "  ${FG_CYAN}6.${RESET} ${FG_GREEN}[script]${RESET} -> ${FG_YELLOW}[db]${RESET} ${BOLD}Read the Last Value Cache${RESET} (script SQL)."
 echo "       ${FG_TEXT}'SELECT COUNT(*) FROM last_cache(...)' returns instantly from memory.${RESET}"

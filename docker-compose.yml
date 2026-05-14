@@ -60,7 +60,7 @@ services:
     ports:
       - "8181:8181"
     healthcheck:
-      test: ["CMD-SHELL", "curl -s --max-time 2 -o /dev/null http://127.0.0.1:8181/health && test -s /var/lib/influxdb3/.iiot-operator-token"]
+      test: ["CMD-SHELL", "test -s /var/lib/influxdb3/.iiot-token-plain && curl -sf --max-time 2 -H \"Authorization: Bearer $(cat /var/lib/influxdb3/.iiot-token-plain)\" http://127.0.0.1:8181/health -o /dev/null"]
       interval: 5s
       timeout: 3s
       retries: 120
@@ -117,7 +117,6 @@ services:
         condition: service_completed_successfully
     environment:
       INFLUX_URL: http://influxdb3:8181
-      INFLUX_PUBLIC_URL: ${INFLUX_PUBLIC_URL:-http://localhost:8181}
       INFLUX_DB: iiot
       INFLUX_TOKEN_FILE: /tokens/.iiot-operator-token
       UI_KPI_POLL_MS: ${UI_KPI_POLL_MS:-2000}
